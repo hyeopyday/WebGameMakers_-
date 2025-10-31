@@ -7,7 +7,7 @@
 ---
 ## 🧑‍💻 Team Members
 
-| Profile | Name | Role | function | GitHub |
+| Profile | Name | branch | function | GitHub |
 |:--------:|:-----|:-----|:-------|:--------|
 | <img src="https://github.com/hyeopyday.png" width="100" /> | **이재협** | main | **팀장** | [@hyeopyday](https://github.com/hyeopyday) |
 | <img src="https://github.com/GUBBIB.png" width="100" /> | **장문용** | feature/1 | **팀원** | [@GUBBIB](https://github.com/GUBBIB) |
