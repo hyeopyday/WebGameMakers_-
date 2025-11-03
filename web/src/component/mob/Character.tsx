@@ -14,6 +14,7 @@ import type { Cell } from "../../type/type";
 const FRAMES = 4;
 const MOVE_SPEED = 200;
 const ANIM_FPS = 10;
+const SPRITE_SCALE = 2;
 
 interface CharacterProps {
   grid: Cell[][];
@@ -213,9 +214,9 @@ const Character = ({ grid }: CharacterProps) => {
         sx, sy, frameW, frameH,
         Math.floor(state.px - frameW / 2),
         Math.floor(state.py - frameH + 6),
-        frameW, frameH
+        frameW * SPRITE_SCALE,
+        frameH * SPRITE_SCALE
       );
-
       for (let i = state.effects.length - 1; i >= 0; i--) {
         const e = state.effects[i];
         e.t += dt;
