@@ -1,12 +1,12 @@
 import './App.css'
-import Map from './componenet/Map'
+import Map from './component/Map/Map'
 
 function App() {
 
   return (
-    <>
+    <div style={{ display: "flex", justifyContent: "center" }}>
       <Map />
-    </>
+    </div>
   )
 }
 

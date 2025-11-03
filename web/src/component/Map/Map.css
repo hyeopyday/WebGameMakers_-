@@ -1,0 +1,13 @@
+/* Map 전체 영역 */
+#Map {
+  position: relative;
+  display: inline-block;
+  border: 2px solid #444;
+  image-rendering: pixelated;
+  background: #120f16; /* 캔버스 밖 배경 */
+}
+
+/* 메인 맵 캔버스 */
+#Map .map-canvas {
+  display: block;
+}
