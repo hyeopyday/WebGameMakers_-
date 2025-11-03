@@ -1,11 +1,11 @@
 import './App.css'
-import Map from './component/Map/Map'
+import Agency from './component/Agency'
 
 function App() {
 
   return (
     <div style={{ display: "flex", justifyContent: "center" }}>
-      <Map />
+      <Agency />
     </div>
   )
 }
