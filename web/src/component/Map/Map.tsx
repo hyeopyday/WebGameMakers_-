@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from "react";
 import tileset from "../../assets/Dungeon_Tileset.png";
+import Character from "../../component/mob/Character";
 import "./Map.css";
 
 /** ====== 기본 설정 ====== */
@@ -235,13 +236,14 @@ const Map: React.FC = () => {
   }, []);
 
   return (
-    <div id="Map">
+    <div id="Map" style={{ position: "relative" }}>
       <canvas
         ref={canvasRef}
         className="map-canvas"
         width={MAP_WIDTH * TILE_SIZE * SCALE}
         height={MAP_HEIGHT * TILE_SIZE * SCALE}
       />
+      <Character /> {/* 캐릭터 추가 */}
     </div>
   );
 };
