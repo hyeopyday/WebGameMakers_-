@@ -1,20 +1,38 @@
+// FILE: src/components/Character.tsx
 import { useEffect, useRef } from "react";
-import characterImg from "../../assets/character.png";
-import { MAP_WIDTH, MAP_HEIGHT , SCALE, TILE_SIZE } from "../../type/type";
+import downPng from "../../assets/character_down.png";
+import leftPng from "../../assets/character_left.png";
+import rightPng from "../../assets/character_right.png";
+import upPng from "../../assets/character_up.png";
+import downLeftPng from "../../assets/character_down_left.png";
+import downRightPng from "../../assets/character_down_right.png";
+import upLeftPng from "../../assets/character_up_left.png";
+import upRightPng from "../../assets/character_up_right.png";
+import { MAP_WIDTH, MAP_HEIGHT, SCALE, TILE_SIZE } from "../../type/type";
 import type { Cell } from "../../type/type";
 
-const FRAME_W = 64;
-const FRAME_H = 64;
 const FRAMES = 4;
 const MOVE_SPEED = 200;
 const ANIM_FPS = 10;
 
-
 interface CharacterProps {
-    grid : Cell[][];
+  grid: Cell[][];
 }
 
-const Character = ({grid} : CharacterProps ) =>  {
+const DIR = {
+  DOWN: 0,
+  LEFT: 1,
+  RIGHT: 2,
+  UP: 3,
+  DOWN_LEFT: 4,
+  DOWN_RIGHT: 5,
+  UP_LEFT: 6,
+  UP_RIGHT: 7,
+} as const;
+
+type DirType = typeof DIR[keyof typeof DIR];
+
+const Character = ({ grid }: CharacterProps) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
   useEffect(() => {
@@ -27,14 +45,38 @@ const Character = ({grid} : CharacterProps ) =>  {
     canvas.style.left = "0";
     canvas.style.top = "0";
     canvas.style.pointerEvents = "none";
+    // @ts-ignore
+    canvas.style.imageRendering = "pixelated";
+    canvas.style.backgroundColor = "transparent";
 
-    const img = new Image();
-    img.src = characterImg;
+    const WORLD_W = MAP_WIDTH * TILE_SIZE * SCALE;
+    const WORLD_H = MAP_HEIGHT * TILE_SIZE * SCALE;
+    canvas.width = WORLD_W;
+    canvas.height = WORLD_H;
+
+    const imgs: Record<number, HTMLImageElement> = {
+      [DIR.DOWN]: new Image(),
+      [DIR.LEFT]: new Image(),
+      [DIR.RIGHT]: new Image(),
+      [DIR.UP]: new Image(),
+      [DIR.DOWN_LEFT]: new Image(),
+      [DIR.DOWN_RIGHT]: new Image(),
+      [DIR.UP_LEFT]: new Image(),
+      [DIR.UP_RIGHT]: new Image(),
+    };
+    imgs[DIR.DOWN].src = downPng;
+    imgs[DIR.LEFT].src = leftPng;
+    imgs[DIR.RIGHT].src = rightPng;
+    imgs[DIR.UP].src = upPng;
+    imgs[DIR.DOWN_LEFT].src = downLeftPng;
+    imgs[DIR.DOWN_RIGHT].src = downRightPng;
+    imgs[DIR.UP_LEFT].src = upLeftPng;
+    imgs[DIR.UP_RIGHT].src = upRightPng;
 
     const state = {
       px: 200,
       py: 200,
-      dir: 0,
+      dir: DIR.DOWN as DirType,
       frame: 0,
       accAnim: 0,
       lastTime: 0,
@@ -58,6 +100,8 @@ const Character = ({grid} : CharacterProps ) =>  {
     };
 
     const onKeyDown = (e: KeyboardEvent) => {
+      console.log('KeyDown:', e.key, e.code);
+      
       if (e.code === "Space") {
         e.preventDefault();
         if (!state.spaceHeld) {
@@ -67,7 +111,11 @@ const Character = ({grid} : CharacterProps ) =>  {
         return;
       }
       const k = e.key as keyof typeof state.key;
-      if (k in state.key) state.key[k] = true;
+      if (k in state.key) {
+        e.preventDefault();
+        state.key[k] = true;
+        console.log('Key set to true:', k);
+      }
     };
 
     const onKeyUp = (e: KeyboardEvent) => {
@@ -76,16 +124,34 @@ const Character = ({grid} : CharacterProps ) =>  {
         return;
       }
       const k = e.key as keyof typeof state.key;
-      if (k in state.key) state.key[k] = false;
+      if (k in state.key) {
+        e.preventDefault();
+        state.key[k] = false;
+      }
     };
 
-    window.addEventListener("keydown", onKeyDown);
-    window.addEventListener("keyup", onKeyUp);
+    document.addEventListener("keydown", onKeyDown);
+    document.addEventListener("keyup", onKeyUp);
 
-    let SHEET_COLS = 1;
-    let SHEET_ROWS = 1;
+    const octantToDir: DirType[] = [
+      DIR.LEFT,
+      DIR.DOWN_LEFT,
+      DIR.DOWN,
+      DIR.DOWN_RIGHT,
+      DIR.RIGHT,
+      DIR.UP_RIGHT,
+      DIR.UP,
+      DIR.UP_LEFT,
+    ];
+
+    const angleToOctant = (theta: number) => {
+      const step = Math.PI / 4;
+      const idx = Math.round((theta + Math.PI) / step) % 8;
+      return idx;
+    };
 
     let raf = 0;
+
     const loop = (t: number) => {
       if (!state.lastTime) state.lastTime = t;
       const dt = Math.min(0.033, (t - state.lastTime) / 1000);
@@ -96,8 +162,7 @@ const Character = ({grid} : CharacterProps ) =>  {
       const lfK = state.key.ArrowLeft || state.key.a;
       const rtK = state.key.ArrowRight || state.key.d;
 
-      let vx = 0,
-        vy = 0;
+      let vx = 0, vy = 0;
       if (upK) vy -= 1;
       if (dnK) vy += 1;
       if (lfK) vx -= 1;
@@ -108,8 +173,9 @@ const Character = ({grid} : CharacterProps ) =>  {
         vx = (vx / len) * MOVE_SPEED;
         vy = (vy / len) * MOVE_SPEED;
 
-        if (Math.abs(vx) > Math.abs(vy)) state.dir = vx > 0 ? 2 : 1;
-        else state.dir = vy > 0 ? 0 : 3;
+        const theta = Math.atan2(vy, vx);
+        const oct = angleToOctant(theta);
+        state.dir = octantToDir[oct];
 
         state.accAnim += dt;
         if (state.accAnim >= 1 / ANIM_FPS) {
@@ -126,32 +192,35 @@ const Character = ({grid} : CharacterProps ) =>  {
       state.px += vx * dt;
       state.py += vy * dt;
 
+      const img = imgs[state.dir];
+
+      const frameW = img.naturalWidth > 0 ? Math.floor(img.naturalWidth / FRAMES) : 64;
+      const frameH = img.naturalHeight > 0 ? img.naturalHeight : 64;
+
+      const halfW = frameW / 2;
+      const footY = frameH - 6;
+      state.px = Math.max(halfW, Math.min(WORLD_W - halfW, state.px));
+      state.py = Math.max(footY, Math.min(WORLD_H, state.py));
+
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-      const sx = (state.frame % SHEET_COLS) * FRAME_W;
-      const sy = Math.min(state.dir, SHEET_ROWS - 1) * FRAME_H;
+      const sx = (state.frame % FRAMES) * frameW;
+      const sy = 0;
 
       ctx.imageSmoothingEnabled = false;
       ctx.drawImage(
         img,
-        sx,
-        sy,
-        FRAME_W,
-        FRAME_H,
-        Math.floor(state.px - FRAME_W / 2),
-        Math.floor(state.py - FRAME_H + 6),
-        FRAME_W,
-        FRAME_H
+        sx, sy, frameW, frameH,
+        Math.floor(state.px - frameW / 2),
+        Math.floor(state.py - frameH + 6),
+        frameW, frameH
       );
 
-      // 효과 업데이트
       for (let i = state.effects.length - 1; i >= 0; i--) {
         const e = state.effects[i];
         e.t += dt;
         if (e.t >= e.life) state.effects.splice(i, 1);
       }
-
-      // 효과 렌더링
       for (const e of state.effects) {
         const k = Math.min(1, e.t / e.life);
         const r = 16 + 64 * k;
@@ -161,7 +230,7 @@ const Character = ({grid} : CharacterProps ) =>  {
         ctx.lineWidth = 3;
         ctx.strokeStyle = "#ffffaa";
         ctx.beginPath();
-        ctx.arc(Math.floor(e.x), Math.floor(e.y - FRAME_H / 2 + 6), r, 0, Math.PI * 2);
+        ctx.arc(Math.floor(e.x), Math.floor(e.y - frameH / 2 + 6), r, 0, Math.PI * 2);
         ctx.stroke();
         ctx.restore();
       }
@@ -169,24 +238,31 @@ const Character = ({grid} : CharacterProps ) =>  {
       raf = requestAnimationFrame(loop);
     };
 
-    const start = () => {
-      SHEET_COLS = Math.max(1, Math.floor(img.width / FRAME_W));
-      SHEET_ROWS = Math.max(1, Math.floor(img.height / FRAME_H));
-      raf = requestAnimationFrame(loop);
+    let loaded = 0;
+    const tryStart = () => {
+      loaded++;
+      if (loaded === 8) raf = requestAnimationFrame(loop);
     };
-
-    if (img.complete) start();
-    else img.onload = start;
+    for (const k of Object.keys(imgs)) {
+      const im = imgs[Number(k)];
+      if (im.complete && im.naturalWidth > 0) tryStart();
+      else im.onload = tryStart;
+    }
 
     return () => {
       cancelAnimationFrame(raf);
-      window.removeEventListener("keydown", onKeyDown);
-      window.removeEventListener("keyup", onKeyUp);
+      document.removeEventListener("keydown", onKeyDown);
+      document.removeEventListener("keyup", onKeyUp);
     };
-  }, []);
+  }, [grid]);
 
-  return <canvas ref={canvasRef} width={MAP_WIDTH * TILE_SIZE * SCALE} height={MAP_HEIGHT * TILE_SIZE * SCALE} />;
+  return (
+    <canvas
+      ref={canvasRef}
+      width={MAP_WIDTH * TILE_SIZE * SCALE}
+      height={MAP_HEIGHT * TILE_SIZE * SCALE}
+    />
+  );
+};
 
-}
-
-  export default Character;
+export default Character;
