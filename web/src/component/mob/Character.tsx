@@ -1,5 +1,7 @@
 import { useEffect, useRef } from "react";
 import characterImg from "../../assets/character.png";
+import { MAP_WIDTH, MAP_HEIGHT , SCALE, TILE_SIZE } from "../../type/type";
+import type { Cell } from "../../type/type";
 
 const FRAME_W = 64;
 const FRAME_H = 64;
@@ -7,7 +9,12 @@ const FRAMES = 4;
 const MOVE_SPEED = 200;
 const ANIM_FPS = 10;
 
-export default function Character() {
+
+interface CharacterProps {
+    grid : Cell[][];
+}
+
+const Character = ({grid} : CharacterProps ) =>  {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
   useEffect(() => {
@@ -41,16 +48,37 @@ export default function Character() {
         s: false,
         d: false,
       },
+      spaceHeld: false,
+      effects: [] as { x: number; y: number; t: number; life: number }[],
+    };
+
+    const useItem = () => {
+      window.dispatchEvent(new CustomEvent("use-item"));
+      state.effects.push({ x: state.px, y: state.py, t: 0, life: 0.35 });
     };
 
     const onKeyDown = (e: KeyboardEvent) => {
+      if (e.code === "Space") {
+        e.preventDefault();
+        if (!state.spaceHeld) {
+          state.spaceHeld = true;
+          useItem();
+        }
+        return;
+      }
       const k = e.key as keyof typeof state.key;
       if (k in state.key) state.key[k] = true;
     };
+
     const onKeyUp = (e: KeyboardEvent) => {
+      if (e.code === "Space") {
+        state.spaceHeld = false;
+        return;
+      }
       const k = e.key as keyof typeof state.key;
       if (k in state.key) state.key[k] = false;
     };
+
     window.addEventListener("keydown", onKeyDown);
     window.addEventListener("keyup", onKeyUp);
 
@@ -116,6 +144,28 @@ export default function Character() {
         FRAME_H
       );
 
+      // 효과 업데이트
+      for (let i = state.effects.length - 1; i >= 0; i--) {
+        const e = state.effects[i];
+        e.t += dt;
+        if (e.t >= e.life) state.effects.splice(i, 1);
+      }
+
+      // 효과 렌더링
+      for (const e of state.effects) {
+        const k = Math.min(1, e.t / e.life);
+        const r = 16 + 64 * k;
+        const alpha = 1 - k;
+        ctx.save();
+        ctx.globalAlpha = alpha;
+        ctx.lineWidth = 3;
+        ctx.strokeStyle = "#ffffaa";
+        ctx.beginPath();
+        ctx.arc(Math.floor(e.x), Math.floor(e.y - FRAME_H / 2 + 6), r, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.restore();
+      }
+
       raf = requestAnimationFrame(loop);
     };
 
@@ -135,5 +185,8 @@ export default function Character() {
     };
   }, []);
 
-  return <canvas ref={canvasRef} width={960} height={540} />;
+  return <canvas ref={canvasRef} width={MAP_WIDTH * TILE_SIZE * SCALE} height={MAP_HEIGHT * TILE_SIZE * SCALE} />;
+
 }
+
+  export default Character;

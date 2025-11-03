@@ -5,3 +5,6 @@ export const WALL: Cell = 1;
 
 export const MAP_WIDTH = 51;
 export const MAP_HEIGHT = 25;
+
+export const TILE_SIZE = 16;
+export const SCALE = 2;

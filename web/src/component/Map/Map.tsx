@@ -118,7 +118,7 @@ const Map = ({grid}: MapProps) => {
         width={MAP_WIDTH * TILE_SIZE * SCALE}
         height={MAP_HEIGHT * TILE_SIZE * SCALE}
       />
-      <Character /> {/* 캐릭터 추가 */}
+      <Character grid = { grid}/> {/* 캐릭터 추가 */}
     </div>
   );
 };
