@@ -13,8 +13,7 @@ import { moveWithWorldCollision } from "./Physic/Physic";
 import enemyPng from "../../assets/Chaser.png";
 
 interface ChaserProps {
-  grid: Cell[][];
-}
+  grid: Cell[][]; paused?: boolean;}
 
 const CHASER_SPEED = 170;
 const PATH_RECALC_TIME = 0.3;
@@ -88,7 +87,7 @@ function findPath(
   return [];
 }
 
-const Chaser = ({ grid }: ChaserProps) => {
+const Chaser = ({ grid, paused }: ChaserProps) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
   useEffect(() => {
@@ -150,6 +149,34 @@ const Chaser = ({ grid }: ChaserProps) => {
       if (!state.lastTime) state.lastTime = t;
       const dt = Math.min(0.033, (t - state.lastTime) / 1000);
       state.lastTime = t;
+
+      if (paused) {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.imageSmoothingEnabled = false;
+    
+        const dirOffset = state.dir * SPRITE_H;
+        const animRow =
+          state.mode === "attack"
+            ? 4 * SPRITE_H + dirOffset
+            : 0 * SPRITE_H + dirOffset;
+    
+        const sx = state.frame * SPRITE_W;
+        const sy = animRow;
+    
+        const destW = SPRITE_W * SPRITE_SCALE;
+        const destH = SPRITE_H * SPRITE_SCALE;
+    
+        ctx.drawImage(
+          enemyImg,
+          sx, sy, SPRITE_W, SPRITE_H,
+          state.px - destW / 2,
+          state.py - destH,
+          destW, destH
+        );
+    
+        raf = requestAnimationFrame(loop);
+        return; // ✅ 아래 로직(경로/이동/공격/쿨다운 감소 등) 전부 스킵
+      }
       state.pathTimer += dt;
 
       // ▼ 쿨다운 감소
@@ -251,7 +278,7 @@ const Chaser = ({ grid }: ChaserProps) => {
       cancelAnimationFrame(raf);
       window.removeEventListener("player-pos", onPlayerPos as EventListener);
     };
-  }, [grid]);
+  }, [grid, paused]);
 
   return (
     <canvas

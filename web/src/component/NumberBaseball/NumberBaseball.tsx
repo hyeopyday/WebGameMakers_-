@@ -1,4 +1,4 @@
-// src/ui/NumberBaseballModal.tsx
+// src/ui/NumberBaseball.tsx
 import React, { useEffect, useMemo, useState } from "react";
 import { judgeGuess, validateGuess, formatAttemptLine } from "../../type/numberBaseball";
 
@@ -15,6 +15,7 @@ type Props = {
   secret: string;          // 부모가 관리하는 시작값
   attemptIndex1: number;   // 1부터 시작하는 시도 번호(표기용)
   onClose: (res: NBResult | null) => void; // null이면 취소/닫기
+  history: string[];
 };
 
 const overlayStyle: React.CSSProperties = {
@@ -97,20 +98,19 @@ const footStyle: React.CSSProperties = {
   justifyContent: "flex-end",
 };
 
-export default function NumberBaseballModal({
+export default function NumberBaseball({
   open,
   length,
   secret,
   attemptIndex1,
   onClose,
+  history,
 }: Props) {
   const [picked, setPicked] = useState<string[]>([]);
   const canSubmit = picked.length === length;
 
   useEffect(() => {
-    if (!open) {
-      setPicked([]);
-    }
+    if (!open) setPicked([]);
   }, [open, length]);
 
   const usedSet = useMemo(() => new Set(picked), [picked]);
@@ -136,6 +136,8 @@ export default function NumberBaseballModal({
     }
     const result = judgeGuess(guess, secret);
     const historyLine = formatAttemptLine(attemptIndex1, guess, result);
+
+
     const win = result.strike === length;
     onClose({ guess, result, historyLine, win });
   };
@@ -147,7 +149,12 @@ export default function NumberBaseballModal({
       <div style={modalStyle} role="dialog" aria-modal="true">
         <div style={headerStyle}>
           <div>숫자야구 — {length}자리 (중복없음, 선행 0 허용)</div>
-          <button onClick={() => onClose(null)} style={{ background: "transparent", color: "#aaa", border: 0, fontSize: 18, cursor: "pointer" }}>✕</button>
+          <button
+            onClick={() => onClose(null)}
+            style={{ background: "transparent", color: "#aaa", border: 0, fontSize: 18, cursor: "pointer" }}
+          >
+            ✕
+          </button>
         </div>
 
         {/* 선택 슬롯 */}
@@ -183,7 +190,9 @@ export default function NumberBaseballModal({
 
         {/* 풋터 */}
         <div style={footStyle}>
-          <button onClick={clearAll} style={{ ...numBtnStyle, padding: "10px 16px" }}>전체 지우기</button>
+          <button onClick={clearAll} style={{ ...numBtnStyle, padding: "10px 16px" }}>
+            전체 지우기
+          </button>
           <button
             onClick={submit}
             style={{

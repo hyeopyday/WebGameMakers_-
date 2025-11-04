@@ -82,9 +82,12 @@ function drawTiles(grid: Cell[][], ctx: CanvasRenderingContext2D, img: HTMLImage
   drawSkeletons(grid, ctx, img);
 }
 
-interface MapProps { grid: Cell[][]; }
+interface MapProps { 
+  grid: Cell[][],
+  paused?: boolean;
+}
 
-const Map = ({ grid }: MapProps) => {
+const Map = ({ grid, paused }: MapProps) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const imgRef = useRef<HTMLImageElement | null>(null);
 
@@ -149,9 +152,9 @@ const Map = ({ grid }: MapProps) => {
         width={MAP_WIDTH * TILE_SIZE * SCALE}
         height={MAP_HEIGHT * TILE_SIZE * SCALE}
       />
-      <Character grid={grid} />
-      <Chaser grid={grid} />
-      <Runner grid={grid} />
+       <Character grid={grid} paused={paused} />
+      <Chaser grid={grid} paused={paused} />
+      <Runner grid={grid} paused={paused} />
       <ArrowOverlay minDist={120} maxDist={1200} size={28} ring={36} />
       <Vision radius={200} feather={90} />
 

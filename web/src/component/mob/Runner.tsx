@@ -13,8 +13,7 @@ import { moveWithWorldCollision } from "./Physic/Physic";
 import runnerPng from "../../assets/Runner.png";
 
 interface RunnerProps {
-  grid: Cell[][];
-}
+  grid: Cell[][]; paused?: boolean;}
 
 const RUNNER_SPEED = 175;
 const CELL_SIZE = TILE_SIZE * SCALE;
@@ -31,6 +30,8 @@ const SPRITE_H = 16;
 const SPRITE_SCALE = 2;
 const FRAMES = 1;
 const ANIM_FPS = 8;
+const COLLIDE_RADIUS = 20;       // 픽셀 반경 (원하는 값으로 조정 가능)
+const COLLIDE_COOLDOWN = 0.8;    // 초단위 쿨다운 (연속 발동 방지)
 
 function clamp(n: number, lo: number, hi: number) {
   return Math.max(lo, Math.min(hi, n));
@@ -133,7 +134,7 @@ function pickEscapePath(
   return [];
 }
 
-const Runner = ({ grid }: RunnerProps) => {
+const Runner = ({ grid, paused }: RunnerProps) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -169,6 +170,8 @@ const Runner = ({ grid }: RunnerProps) => {
       lastPlayerPos: { x: 0, y: 0 },
       lastPdist: Number.POSITIVE_INFINITY,
       preferLeft: true,
+
+      collideCd: 0,
     };
 
     const s = findSpawnPoint(grid, { clearance: 0 });
@@ -215,8 +218,31 @@ const Runner = ({ grid }: RunnerProps) => {
       if (!state.lastTime) state.lastTime = t;
       const dt = Math.min(0.033, (t - state.lastTime) / 1000);
       state.lastTime = t;
+
+      /// 추가한 부분 
+      if (paused) {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.imageSmoothingEnabled = false;
+    
+        if (img.complete && img.naturalWidth > 0) {
+          const destW = SPRITE_W * SPRITE_SCALE;
+          const destH = SPRITE_H * SPRITE_SCALE;
+          ctx.drawImage(
+            img,
+            0, 0, SPRITE_W, SPRITE_H,
+            Math.floor(state.px - destW / 2),
+            Math.floor(state.py - destH),
+            destW, destH
+          );
+        }
+        raf = requestAnimationFrame(loop);
+        return; // ✅ 이동/충돌/경로/쿨다운 갱신 모두 막음
+      }
+
       state.pathTimer += dt;
       if (state.goalLock > 0) state.goalLock -= dt;
+      if (state.collideCd > 0) state.collideCd -= dt;
+
 
       const pdx = state.targetX - state.px;
       const pdy = state.targetY - state.py;
@@ -225,6 +251,16 @@ const Runner = ({ grid }: RunnerProps) => {
       if (state.mode === "idle" && pdist < SAFE_INNER) state.mode = "escape";
       else if (state.mode === "escape" && pdist > SAFE_OUTER) state.mode = "idle";
 
+      if (state.havePlayer && pdist <= COLLIDE_RADIUS && state.collideCd <= 0) {
+        state.collideCd = COLLIDE_COOLDOWN;
+
+        // 숫자야구 실행을 외부에 알림 (글로벌 이벤트)
+        window.dispatchEvent(new CustomEvent("enemyA-collide"));
+      
+        // 몹은 도망가기 모드 유지하도록 약간의 보정(옵션)
+        state.mode = "escape";
+        state.pathTimer = PATH_RECALC_TIME;
+      }
       const pcx = Math.floor(state.targetX / CELL_SIZE);
       const pcy = Math.floor(state.targetY / CELL_SIZE);
       const playerMovedCell = pcx !== state.lastPlayerCell.x || pcy !== state.lastPlayerCell.y;
@@ -307,7 +343,7 @@ const Runner = ({ grid }: RunnerProps) => {
       cancelAnimationFrame(raf);
       window.removeEventListener("player-pos", onPlayerPos as EventListener);
     };
-  }, [grid]);
+  }, [grid, paused]);
 
   return (
     <canvas

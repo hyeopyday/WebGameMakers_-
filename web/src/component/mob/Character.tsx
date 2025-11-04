@@ -25,7 +25,8 @@ import { moveWithWorldCollision } from "./Physic/Physic";
 const FRAMES = 4;
 
 interface CharacterProps {
-  grid: Cell[][];
+  grid: Cell[][]; 
+  paused?: boolean;
 }
 
 const DIR = {
@@ -41,7 +42,7 @@ const DIR = {
 
 type DirType = typeof DIR[keyof typeof DIR];
 
-const Character = ({ grid }: CharacterProps) => {
+const Character = ({ grid, paused }: CharacterProps) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
   useEffect(() => {
@@ -123,6 +124,7 @@ const Character = ({ grid }: CharacterProps) => {
     };
 
     const onKeyDown = (e: KeyboardEvent) => {
+      if (paused) { e.preventDefault(); return; }   // ✅ 추가
       if (e.code === "Space") {
         e.preventDefault();
         if (!state.spaceHeld) {
@@ -137,7 +139,9 @@ const Character = ({ grid }: CharacterProps) => {
         state.key[k] = true;
       }
     };
+    
     const onKeyUp = (e: KeyboardEvent) => {
+      if (paused) { e.preventDefault(); return; }   // ✅ 추가
       if (e.code === "Space") {
         state.spaceHeld = false;
         return;
@@ -148,6 +152,7 @@ const Character = ({ grid }: CharacterProps) => {
         state.key[k] = false;
       }
     };
+    
 
     document.addEventListener("keydown", onKeyDown);
     document.addEventListener("keyup", onKeyUp);
@@ -190,27 +195,61 @@ const Character = ({ grid }: CharacterProps) => {
       if (!state.lastTime) state.lastTime = t;
       const dt = Math.min(0.033, (t - state.lastTime) / 1000);
       state.lastTime = t;
-
+    
+      // 렌더에 필요한 값 미리 계산
+      const img = imgs[state.dir];
+      const frameW = img.naturalWidth > 0 ? Math.floor(img.naturalWidth / FRAMES) : 64;
+      const frameH = img.naturalHeight > 0 ? img.naturalHeight : 64;
+      const destW = frameW * SPRITE_SCALE;
+      const destH = frameH * SPRITE_SCALE;
+      const destX = Math.floor(state.px - destW / 2);
+      const destY = Math.floor(state.py - destH);
+    
+      // ✅ 일시정지: 입력/이동/애니메이션/이펙트 계산 스킵, 현재 프레임만 그리기
+      if (paused) {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.imageSmoothingEnabled = false;
+    
+        // (옵션) 무적 깜빡임은 유지
+        let skipDraw = false;
+        if (state.invincibleUntil > performance.now()) {
+          state.blinkPhase += dt * 20;
+          skipDraw = Math.floor(state.blinkPhase) % 2 === 0;
+        } else {
+          state.blinkPhase = 0;
+        }
+    
+        if (!skipDraw) {
+          const sx = (state.frame % FRAMES) * frameW;
+          const sy = 0;
+          ctx.drawImage(img, sx, sy, frameW, frameH, destX, destY, destW, destH);
+        }
+    
+        raf = requestAnimationFrame(loop);
+        return; // ⬅️ 아래 로직 모두 정지
+      }
+    
+      // ⬇️ 여기부터 기존 로직 유지
       const upK = state.key.ArrowUp || state.key.w;
       const dnK = state.key.ArrowDown || state.key.s;
       const lfK = state.key.ArrowLeft || state.key.a;
       const rtK = state.key.ArrowRight || state.key.d;
-
+    
       let vx = 0, vy = 0;
       if (upK) vy -= 1;
       if (dnK) vy += 1;
       if (lfK) vx -= 1;
       if (rtK) vx += 1;
-
+    
       if (vx !== 0 || vy !== 0) {
         const len = Math.hypot(vx, vy);
         vx = (vx / len) * MOVE_SPEED;
         vy = (vy / len) * MOVE_SPEED;
-
+    
         const theta = Math.atan2(vy, vx);
         const oct = angleToOctant(theta);
         state.dir = octantToDir[oct];
-
+    
         state.accAnim += dt;
         if (state.accAnim >= 1 / ANIM_FPS) {
           state.frame = (state.frame + 1) % FRAMES;
@@ -222,26 +261,17 @@ const Character = ({ grid }: CharacterProps) => {
         state.frame = 0;
         state.accAnim = 0;
       }
-
+    
       const moved = moveWithWorldCollision(state.px, state.py, vx, vy, dt, grid);
       state.px = moved.x;
       state.py = moved.y;
-
+    
       window.dispatchEvent(new CustomEvent("player-pos", { detail: { x: state.px, y: state.py } }));
-
-      const img = imgs[state.dir];
-      const frameW = img.naturalWidth > 0 ? Math.floor(img.naturalWidth / FRAMES) : 64;
-      const frameH = img.naturalHeight > 0 ? img.naturalHeight : 64;
-
-      const destW = frameW * SPRITE_SCALE;
-      const destH = frameH * SPRITE_SCALE;
-      const destX = Math.floor(state.px - destW / 2);
-      const destY = Math.floor(state.py - destH);
-
+    
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       ctx.imageSmoothingEnabled = false;
-
-      // ▼ 추가: 무적 깜빡임. 렌더 토글만. 로직 변경 없음.
+    
+      // 무적 깜빡임
       let skipDraw = false;
       if (state.invincibleUntil > performance.now()) {
         state.blinkPhase += dt * 20;
@@ -249,13 +279,13 @@ const Character = ({ grid }: CharacterProps) => {
       } else {
         state.blinkPhase = 0;
       }
-
+    
       if (!skipDraw) {
         const sx = (state.frame % FRAMES) * frameW;
         const sy = 0;
         ctx.drawImage(img, sx, sy, frameW, frameH, destX, destY, destW, destH);
       }
-
+    
       for (let i = state.effects.length - 1; i >= 0; i--) {
         const e = state.effects[i];
         e.t += dt;
@@ -274,9 +304,10 @@ const Character = ({ grid }: CharacterProps) => {
         ctx.stroke();
         ctx.restore();
       }
-
+    
       raf = requestAnimationFrame(loop);
     };
+    
 
     let loaded = 0;
     const tryStart = () => {
@@ -295,7 +326,7 @@ const Character = ({ grid }: CharacterProps) => {
       document.removeEventListener("keyup", onKeyUp);
       window.removeEventListener("player-hit", onPlayerHit as EventListener);
     };
-  }, [grid]);
+  }, [grid, paused]);
 
   return (
     <canvas
