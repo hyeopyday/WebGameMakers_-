@@ -5,14 +5,10 @@ import tileset from "../../assets/Dungeon_Tileset.png";
 import Character from "../../component/mob/Character";
 import "./Map.css";
 
-/** ====== 기본 설정 ====== */
 const TILE_SIZE = 16;
 const SCALE = 2;
-const MAP_WIDTH = 51;   // 홀수 권장
-const MAP_HEIGHT = 25;  // 홀수 권장
-
-/** ====== 오토타일 (왼쪽 위 3×3 세트만 사용) ====== */
-// 필요한 경우 여기만 조정 (왼쪽 위가 아니라 옆칸이면 1로, 두 칸 옆이면 2로)
+const MAP_WIDTH = 51;
+const MAP_HEIGHT = 25;
 
 const WALL_TILE: [number, number] = [2, 0];
 const FLOOR_TILE: [number, number] = [2, 2];
@@ -22,7 +18,6 @@ const SKELETON_TILE: [number, number] = [7, 7];
 function drawTorches(grid: Cell[][], ctx: CanvasRenderingContext2D, img: HTMLImageElement) {
   const H = grid.length, W = grid[0].length;
   const probability = 0.05;
-
   for (let y = 1; y < H - 1; y++) {
     for (let x = 1; x < W - 1; x++) {
       if (grid[y][x] !== WALL) continue;
@@ -45,7 +40,6 @@ function drawTorches(grid: Cell[][], ctx: CanvasRenderingContext2D, img: HTMLIma
 function drawSkeletons(grid: Cell[][], ctx: CanvasRenderingContext2D, img: HTMLImageElement) {
   const H = grid.length, W = grid[0].length;
   const probability = 0.01;
-
   for (let y = 0; y < H; y++) {
     for (let x = 0; x < W; x++) {
       if (grid[y][x] !== FLOOR) continue;
@@ -60,13 +54,10 @@ function drawSkeletons(grid: Cell[][], ctx: CanvasRenderingContext2D, img: HTMLI
   }
 }
 
-/** ====== 기존 drawTiles() 수정 ====== */
 function drawTiles(grid: Cell[][], ctx: CanvasRenderingContext2D, img: HTMLImageElement) {
-  if (!grid?.length || !grid[0]?.length) return; // ✅ 그리드 준비 전엔 그리지 않음
+  if (!grid?.length || !grid[0]?.length) return;
   ctx.imageSmoothingEnabled = false;
-
-  const H = grid.length;
-  const W = grid[0].length;
+  const H = grid.length, W = grid[0].length;
 
   for (let y = 0; y < H; y++) {
     for (let x = 0; x < W; x++) {
@@ -79,20 +70,15 @@ function drawTiles(grid: Cell[][], ctx: CanvasRenderingContext2D, img: HTMLImage
       );
     }
   }
-
-  drawTorches(grid, ctx, img);    // (이 함수들도 내부에서 H/W 계산하도록 수정 권장)
-  drawSkeletons(grid, ctx, img);  // 아래 1-1 참고
+  drawTorches(grid, ctx, img);
+  drawSkeletons(grid, ctx, img);
 }
 
+interface MapProps { grid: Cell[][]; }
 
-
-interface MapProps {
-    grid : Cell[][];
-}
-
-/** ====== 컴포넌트 ====== */
-const Map = ({grid}: MapProps) => {
+const Map = ({ grid }: MapProps) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const imgRef = useRef<HTMLImageElement | null>(null);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -100,14 +86,51 @@ const Map = ({grid}: MapProps) => {
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    const img = new Image();
-    img.src = tileset;
-    img.onload = () => {
+    // grid 준비 전엔 아무것도 하지 않음
+    if (!grid?.length || !grid[0]?.length) return;
+
+    canvas.width = MAP_WIDTH * TILE_SIZE * SCALE;
+    canvas.height = MAP_HEIGHT * TILE_SIZE * SCALE;
+
+    let cancelled = false;
+
+    const draw = () => {
+      if (cancelled) return;
       ctx.clearRect(0, 0, canvas.width, canvas.height);
+      const img = imgRef.current!;
       drawTiles(grid, ctx, img);
     };
 
+    // 이미지 1회 초기화 & 재사용
+    if (!imgRef.current) {
+      const img = new Image();
+      img.decoding = "async";
+      // 핸들러 먼저 등록
+      img.onload = () => draw();
+      img.onerror = (e) => {
+        console.error("tileset load error", e);
+      };
+      imgRef.current = img;
+      // src 나중에 세팅
+      img.src = tileset;
+      // 캐시 히트 보정
+      if (img.complete && img.naturalWidth > 0) {
+        // onload가 이미 지나갔을 수 있으니 직접 그리기
+        requestAnimationFrame(draw);
+      }
+    } else {
+      const img = imgRef.current;
+      if (img.complete && img.naturalWidth > 0) {
+        requestAnimationFrame(draw);
+      } else {
+        // 아직 로딩 중이면 onload에서 그려짐
+        img.onload = () => draw();
+      }
+    }
+
+    return () => {
+      cancelled = true;
+    };
   }, [grid]);
 
   return (
@@ -118,7 +141,7 @@ const Map = ({grid}: MapProps) => {
         width={MAP_WIDTH * TILE_SIZE * SCALE}
         height={MAP_HEIGHT * TILE_SIZE * SCALE}
       />
-      <Character grid = {grid}/> {/* 캐릭터 추가 */}
+      <Character grid={grid} />
     </div>
   );
 };
