@@ -1,5 +1,5 @@
 // Agency.tsx (또는 MainMenu 등 모달을 띄우는 곳)
-import React, { useEffect, useState, useCallback } from "react";
+import { useEffect, useState } from "react";
 import NumberBaseball from "./NumberBaseball/NumberBaseball";            // 너 파일명
 import { MODE_LENGTH, generateSecret } from "../type/numberBaseball";
 import { createGrid, carveMazeDFS, addSmallRooms, carveHighways, braidDeadEnds, openWallsForOpenness } from '../utils/gridGenerator';

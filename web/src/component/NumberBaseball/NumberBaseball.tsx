@@ -104,7 +104,6 @@ export default function NumberBaseball({
   secret,
   attemptIndex1,
   onClose,
-  history,
 }: Props) {
   const [picked, setPicked] = useState<string[]>([]);
   const canSubmit = picked.length === length;
