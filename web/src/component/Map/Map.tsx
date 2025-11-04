@@ -4,6 +4,8 @@ import { FLOOR, WALL } from "../../type/type";
 import tileset from "../../assets/Dungeon_Tileset.png";
 import Chaser from "../../component/mob/Chaser";
 import Character from "../../component/mob/Character";
+import Runner from "../../component/mob/Runner";
+
 
 import "./Map.css";
 
@@ -145,6 +147,7 @@ const Map = ({ grid }: MapProps) => {
       />
       <Character grid={grid} />
       <Chaser grid={grid} />
+      <Runner grid={grid} />
 
     </div>
   );
