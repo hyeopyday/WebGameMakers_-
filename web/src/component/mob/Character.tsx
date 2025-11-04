@@ -214,6 +214,9 @@ const Character = ({ grid }: CharacterProps) => {
       const moved = moveWithWorldCollision(state.px, state.py, vx, vy, dt, grid);
       state.px = moved.x;
       state.py = moved.y;
+      
+      window.dispatchEvent(new CustomEvent("player-pos", { detail: { x: state.px, y: state.py } }));
+
 
       // 렌더: py(발 라인)에 스프라이트 아래끝을 맞춤
       const img = imgs[state.dir];
