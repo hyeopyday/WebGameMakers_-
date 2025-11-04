@@ -2,7 +2,15 @@ import { useEffect, useRef } from "react";
 import type { Cell } from "../../type/type";
 import { FLOOR, WALL } from "../../type/type";
 import tileset from "../../assets/Dungeon_Tileset.png";
+import Chaser from "../../component/mob/Chaser";
 import Character from "../../component/mob/Character";
+import Runner from "../../component/mob/Runner";
+import Vision from "../../component/Map/Vision";
+import ArrowOverlay from "../../component/Map/ArrowOverlay";
+
+
+
+
 import "./Map.css";
 
 const TILE_SIZE = 16;
@@ -142,6 +150,11 @@ const Map = ({ grid }: MapProps) => {
         height={MAP_HEIGHT * TILE_SIZE * SCALE}
       />
       <Character grid={grid} />
+      <Chaser grid={grid} />
+      <Runner grid={grid} />
+      <ArrowOverlay minDist={120} maxDist={1200} size={28} ring={36} />
+      <Vision radius={200} feather={90} />
+
     </div>
   );
 };
