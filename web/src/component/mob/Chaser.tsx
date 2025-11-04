@@ -7,7 +7,6 @@ import {
   SCALE,
   TILE_SIZE,
   findSpawnPoint,
-  FLOOR,
   WALL,
 } from "../../type/type";
 import { moveWithWorldCollision } from "./Physic/Physic";
