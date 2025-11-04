@@ -20,23 +20,19 @@ const TORCH_TILE: [number, number] = [0, 9];
 const SKELETON_TILE: [number, number] = [7, 7];
 
 function drawTorches(grid: Cell[][], ctx: CanvasRenderingContext2D, img: HTMLImageElement) {
-  const probability = 0.05; // 25% 확률로 설치
+  const H = grid.length, W = grid[0].length;
+  const probability = 0.05;
 
-  for (let y = 1; y < MAP_HEIGHT - 1; y++) {
-    for (let x = 1; x < MAP_WIDTH - 1; x++) {
+  for (let y = 1; y < H - 1; y++) {
+    for (let x = 1; x < W - 1; x++) {
       if (grid[y][x] !== WALL) continue;
-
-      // 아래쪽으로 내려가며 연속된 벽 탐색
       let ny = y;
-      while (ny + 1 < MAP_HEIGHT && grid[ny + 1][x] === WALL) ny++;
-
-      // 맨 아래 벽만 Torch 후보
-      if (ny + 1 < MAP_HEIGHT && grid[ny + 1][x] === FLOOR) {
+      while (ny + 1 < H && grid[ny + 1][x] === WALL) ny++;
+      if (ny + 1 < H && grid[ny + 1][x] === FLOOR) {
         if (Math.random() < probability) {
           const [tx, ty] = TORCH_TILE;
           ctx.drawImage(
-            img,
-            tx * TILE_SIZE, ty * TILE_SIZE, TILE_SIZE, TILE_SIZE,
+            img, tx * TILE_SIZE, ty * TILE_SIZE, TILE_SIZE, TILE_SIZE,
             x * TILE_SIZE * SCALE, ny * TILE_SIZE * SCALE,
             TILE_SIZE * SCALE, TILE_SIZE * SCALE
           );
@@ -47,17 +43,16 @@ function drawTorches(grid: Cell[][], ctx: CanvasRenderingContext2D, img: HTMLIma
 }
 
 function drawSkeletons(grid: Cell[][], ctx: CanvasRenderingContext2D, img: HTMLImageElement) {
-  const probability = 0.01; // 2% 정도. 더 드물게 하려면 0.01, 0.005 등으로 낮춰줘
+  const H = grid.length, W = grid[0].length;
+  const probability = 0.01;
 
-  for (let y = 0; y < MAP_HEIGHT; y++) {
-    for (let x = 0; x < MAP_WIDTH; x++) {
-      if (grid[y][x] !== FLOOR) continue;       // 길에만 배치
+  for (let y = 0; y < H; y++) {
+    for (let x = 0; x < W; x++) {
+      if (grid[y][x] !== FLOOR) continue;
       if (Math.random() >= probability) continue;
-
       const [tx, ty] = SKELETON_TILE;
       ctx.drawImage(
-        img,
-        tx * TILE_SIZE, ty * TILE_SIZE, TILE_SIZE, TILE_SIZE,
+        img, tx * TILE_SIZE, ty * TILE_SIZE, TILE_SIZE, TILE_SIZE,
         x * TILE_SIZE * SCALE, y * TILE_SIZE * SCALE,
         TILE_SIZE * SCALE, TILE_SIZE * SCALE
       );
@@ -67,10 +62,14 @@ function drawSkeletons(grid: Cell[][], ctx: CanvasRenderingContext2D, img: HTMLI
 
 /** ====== 기존 drawTiles() 수정 ====== */
 function drawTiles(grid: Cell[][], ctx: CanvasRenderingContext2D, img: HTMLImageElement) {
+  if (!grid?.length || !grid[0]?.length) return; // ✅ 그리드 준비 전엔 그리지 않음
   ctx.imageSmoothingEnabled = false;
 
-  for (let y = 0; y < MAP_HEIGHT; y++) {
-    for (let x = 0; x < MAP_WIDTH; x++) {
+  const H = grid.length;
+  const W = grid[0].length;
+
+  for (let y = 0; y < H; y++) {
+    for (let x = 0; x < W; x++) {
       const [tx, ty] = (grid[y][x] === FLOOR) ? FLOOR_TILE : WALL_TILE;
       ctx.drawImage(
         img,
@@ -81,9 +80,10 @@ function drawTiles(grid: Cell[][], ctx: CanvasRenderingContext2D, img: HTMLImage
     }
   }
 
-  drawTorches(grid, ctx, img);
-  drawSkeletons(grid, ctx, img);
+  drawTorches(grid, ctx, img);    // (이 함수들도 내부에서 H/W 계산하도록 수정 권장)
+  drawSkeletons(grid, ctx, img);  // 아래 1-1 참고
 }
+
 
 
 interface MapProps {
@@ -118,7 +118,7 @@ const Map = ({grid}: MapProps) => {
         width={MAP_WIDTH * TILE_SIZE * SCALE}
         height={MAP_HEIGHT * TILE_SIZE * SCALE}
       />
-      <Character grid = { grid}/> {/* 캐릭터 추가 */}
+      <Character grid = {grid}/> {/* 캐릭터 추가 */}
     </div>
   );
 };

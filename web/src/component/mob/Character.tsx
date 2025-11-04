@@ -8,13 +8,21 @@ import downLeftPng from "../../assets/character_up_left.png";
 import downRightPng from "../../assets/character_up_right.png";
 import upLeftPng from "../../assets/character_down_left.png";
 import upRightPng from "../../assets/character_down_right.png";
-import { MAP_WIDTH, MAP_HEIGHT, SCALE, TILE_SIZE } from "../../type/type";
+
 import type { Cell } from "../../type/type";
+import {
+  MAP_WIDTH,
+  MAP_HEIGHT,
+  SCALE,
+  TILE_SIZE,
+  MOVE_SPEED,
+  ANIM_FPS,
+  SPRITE_SCALE,
+  findSpawnPoint
+} from "../../type/type";
+import { moveWithWorldCollision } from "./Physic/Physic";
 
 const FRAMES = 4;
-const MOVE_SPEED = 200;
-const ANIM_FPS = 10;
-const SPRITE_SCALE = 2;
 
 interface CharacterProps {
   grid: Cell[][];
@@ -42,6 +50,10 @@ const Character = ({ grid }: CharacterProps) => {
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
+    if (!grid?.length || !grid[0]?.length) return;
+
+
+    // canvas 스타일
     canvas.style.position = "absolute";
     canvas.style.left = "0";
     canvas.style.top = "0";
@@ -50,11 +62,13 @@ const Character = ({ grid }: CharacterProps) => {
     canvas.style.imageRendering = "pixelated";
     canvas.style.backgroundColor = "transparent";
 
+    // 캔버스 크기
     const WORLD_W = MAP_WIDTH * TILE_SIZE * SCALE;
     const WORLD_H = MAP_HEIGHT * TILE_SIZE * SCALE;
     canvas.width = WORLD_W;
     canvas.height = WORLD_H;
 
+    // 스프라이트 이미지 로드
     const imgs: Record<number, HTMLImageElement> = {
       [DIR.DOWN]: new Image(),
       [DIR.LEFT]: new Image(),
@@ -74,9 +88,10 @@ const Character = ({ grid }: CharacterProps) => {
     imgs[DIR.UP_LEFT].src = upLeftPng;
     imgs[DIR.UP_RIGHT].src = upRightPng;
 
+    // 상태
     const state = {
-      px: 200,
-      py: 200,
+      px: 0,
+      py: 0,
       dir: DIR.DOWN as DirType,
       frame: 0,
       accAnim: 0,
@@ -95,14 +110,20 @@ const Character = ({ grid }: CharacterProps) => {
       effects: [] as { x: number; y: number; t: number; life: number }[],
     };
 
+    // ✅ 스폰 지점: 벽/장애물(길 아님)을 피해서 랜덤 선택
+    {
+      const spawn = findSpawnPoint(grid, { clearance: 0 }); // 넓은 자리 선호하면 1
+      state.px = spawn.x;
+      state.py = spawn.y;
+    }
+
     const useItem = () => {
       window.dispatchEvent(new CustomEvent("use-item"));
       state.effects.push({ x: state.px, y: state.py, t: 0, life: 0.35 });
     };
 
+    // 입력 처리
     const onKeyDown = (e: KeyboardEvent) => {
-      console.log('KeyDown:', e.key, e.code);
-      
       if (e.code === "Space") {
         e.preventDefault();
         if (!state.spaceHeld) {
@@ -115,10 +136,8 @@ const Character = ({ grid }: CharacterProps) => {
       if (k in state.key) {
         e.preventDefault();
         state.key[k] = true;
-        console.log('Key set to true:', k);
       }
     };
-
     const onKeyUp = (e: KeyboardEvent) => {
       if (e.code === "Space") {
         state.spaceHeld = false;
@@ -134,6 +153,7 @@ const Character = ({ grid }: CharacterProps) => {
     document.addEventListener("keydown", onKeyDown);
     document.addEventListener("keyup", onKeyUp);
 
+    // 방향 계산
     const octantToDir: DirType[] = [
       DIR.LEFT,
       DIR.DOWN_LEFT,
@@ -144,7 +164,6 @@ const Character = ({ grid }: CharacterProps) => {
       DIR.UP,
       DIR.UP_LEFT,
     ];
-
     const angleToOctant = (theta: number) => {
       const step = Math.PI / 4;
       const idx = Math.round((theta + Math.PI) / step) % 8;
@@ -158,6 +177,7 @@ const Character = ({ grid }: CharacterProps) => {
       const dt = Math.min(0.033, (t - state.lastTime) / 1000);
       state.lastTime = t;
 
+      // 입력 → 속도
       const upK = state.key.ArrowUp || state.key.w;
       const dnK = state.key.ArrowDown || state.key.s;
       const lfK = state.key.ArrowLeft || state.key.a;
@@ -190,33 +210,29 @@ const Character = ({ grid }: CharacterProps) => {
         state.accAnim = 0;
       }
 
-      state.px += vx * dt;
-      state.py += vy * dt;
+      // ✅ 이동/충돌: 공용 래퍼 호출 (type.ts에 규칙 통합)
+      const moved = moveWithWorldCollision(state.px, state.py, vx, vy, dt, grid);
+      state.px = moved.x;
+      state.py = moved.y;
 
+      // 렌더: py(발 라인)에 스프라이트 아래끝을 맞춤
       const img = imgs[state.dir];
-
       const frameW = img.naturalWidth > 0 ? Math.floor(img.naturalWidth / FRAMES) : 64;
       const frameH = img.naturalHeight > 0 ? img.naturalHeight : 64;
 
-      const halfW = frameW / 2;
-      const footY = frameH - 6;
-      state.px = Math.max(halfW, Math.min(WORLD_W - halfW, state.px));
-      state.py = Math.max(footY, Math.min(WORLD_H, state.py));
+      const destW = frameW * SPRITE_SCALE;
+      const destH = frameH * SPRITE_SCALE;
+      const destX = Math.floor(state.px - destW / 2);
+      const destY = Math.floor(state.py - destH);
 
       ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.imageSmoothingEnabled = false;
 
       const sx = (state.frame % FRAMES) * frameW;
       const sy = 0;
+      ctx.drawImage(img, sx, sy, frameW, frameH, destX, destY, destW, destH);
 
-      ctx.imageSmoothingEnabled = false;
-      ctx.drawImage(
-        img,
-        sx, sy, frameW, frameH,
-        Math.floor(state.px - frameW / 2),
-        Math.floor(state.py - frameH + 6),
-        frameW * SPRITE_SCALE,
-        frameH * SPRITE_SCALE
-      );
+      // (선택) 이펙트 유지
       for (let i = state.effects.length - 1; i >= 0; i--) {
         const e = state.effects[i];
         e.t += dt;
@@ -231,7 +247,7 @@ const Character = ({ grid }: CharacterProps) => {
         ctx.lineWidth = 3;
         ctx.strokeStyle = "#ffffaa";
         ctx.beginPath();
-        ctx.arc(Math.floor(e.x), Math.floor(e.y - frameH / 2 + 6), r, 0, Math.PI * 2);
+        ctx.arc(Math.floor(e.x), Math.floor(e.y - destH / 2), r, 0, Math.PI * 2);
         ctx.stroke();
         ctx.restore();
       }
@@ -239,6 +255,7 @@ const Character = ({ grid }: CharacterProps) => {
       raf = requestAnimationFrame(loop);
     };
 
+    // 이미지 로딩 카운트
     let loaded = 0;
     const tryStart = () => {
       loaded++;
