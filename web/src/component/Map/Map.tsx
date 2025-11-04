@@ -6,6 +6,8 @@ import Chaser from "../../component/mob/Chaser";
 import Character from "../../component/mob/Character";
 import Runner from "../../component/mob/Runner";
 import Vision from "../../component/Map/Vision";
+import ArrowOverlay from "../../component/Map/ArrowOverlay";
+
 
 
 
@@ -150,6 +152,7 @@ const Map = ({ grid }: MapProps) => {
       <Character grid={grid} />
       <Chaser grid={grid} />
       <Runner grid={grid} />
+      <ArrowOverlay minDist={120} maxDist={1200} size={28} ring={36} />
       <Vision radius={200} feather={90} />
 
     </div>

@@ -363,6 +363,7 @@ const Runner = ({ grid }: RunnerProps) => {
           );
           state.px = clamp(moved.x, 0, WORLD_W);
           state.py = clamp(moved.y, 0, WORLD_H);
+          window.dispatchEvent(new CustomEvent("runner-pos", { detail: { x: state.px, y: state.py } }));
         }
       } else if (state.mode === "escape" && pdist < ESCAPE_KEEP) {
         // 경로 없음 + 충분히 멀지 않음 → 즉시 재계산 유도
