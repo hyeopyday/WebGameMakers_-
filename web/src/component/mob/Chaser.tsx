@@ -19,14 +19,17 @@ interface ChaserProps {
 
 const CHASER_SPEED = 170;
 const PATH_RECALC_TIME = 0.3;
-const ATTACK_RANGE = 25; // ✅ 더 가까이 붙어서 공격
-const ATTACK_FREEZE = 0.4; // ✅ 공격 중 정지 시간(초)
+const ATTACK_RANGE = 25;
+const ATTACK_FREEZE = 0.4;
 const SPRITE_W = 32;
 const SPRITE_H = 32;
 const SPRITE_SCALE = 2;
 const FRAMES = 4;
 const ANIM_FPS = 8;
 const CELL_SIZE = TILE_SIZE * SCALE;
+
+// ▼ 추가: 공격 쿨다운
+const ATTACK_COOLDOWN = 0.9;
 
 function findPath(
   grid: Cell[][],
@@ -119,6 +122,9 @@ const Chaser = ({ grid }: ChaserProps) => {
       accAnim: 0,
       mode: "idle" as "idle" | "attack",
       attackFreeze: 0,
+      // ▼ 추가: 공격 쿨다운
+      attackCD: 0,
+
       path: [] as { x: number; y: number }[],
       pathTimer: 0,
       targetX: 0,
@@ -147,11 +153,14 @@ const Chaser = ({ grid }: ChaserProps) => {
       state.lastTime = t;
       state.pathTimer += dt;
 
+      // ▼ 쿨다운 감소
+      if (state.attackCD > 0) state.attackCD = Math.max(0, state.attackCD - dt);
+
       const dx = state.targetX - state.px;
       const dy = state.targetY - state.py;
       const dist = Math.hypot(dx, dy);
 
-      // 상태 전환 (공격/이동)
+      // 상태 전환
       if (dist < ATTACK_RANGE && state.mode !== "attack") {
         state.mode = "attack";
         state.attackFreeze = ATTACK_FREEZE;
@@ -160,6 +169,12 @@ const Chaser = ({ grid }: ChaserProps) => {
       }
 
       if (state.attackFreeze > 0) state.attackFreeze -= dt;
+
+      // ▼ 공격 판정: 사정거리 + 쿨다운 여유
+      if (dist < ATTACK_RANGE && state.attackCD <= 0) {
+        window.dispatchEvent(new CustomEvent("player-hit", { detail: { dmg: 1 } }));
+        state.attackCD = ATTACK_COOLDOWN;
+      }
 
       // 방향 계산
       if (Math.abs(dx) > Math.abs(dy)) {
@@ -211,8 +226,8 @@ const Chaser = ({ grid }: ChaserProps) => {
       const dirOffset = state.dir * SPRITE_H;
       const animRow =
         state.mode === "attack"
-          ? 4 * SPRITE_H + dirOffset // 공격 (5~6행)
-          : 0 * SPRITE_H + dirOffset; // 이동 (1~4행)
+          ? 4 * SPRITE_H + dirOffset
+          : 0 * SPRITE_H + dirOffset;
 
       const sx = state.frame * SPRITE_W;
       const sy = animRow;

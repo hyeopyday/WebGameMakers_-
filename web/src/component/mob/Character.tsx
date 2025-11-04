@@ -52,8 +52,6 @@ const Character = ({ grid }: CharacterProps) => {
 
     if (!grid?.length || !grid[0]?.length) return;
 
-
-    // canvas 스타일
     canvas.style.position = "absolute";
     canvas.style.left = "0";
     canvas.style.top = "0";
@@ -62,13 +60,11 @@ const Character = ({ grid }: CharacterProps) => {
     canvas.style.imageRendering = "pixelated";
     canvas.style.backgroundColor = "transparent";
 
-    // 캔버스 크기
     const WORLD_W = MAP_WIDTH * TILE_SIZE * SCALE;
     const WORLD_H = MAP_HEIGHT * TILE_SIZE * SCALE;
     canvas.width = WORLD_W;
     canvas.height = WORLD_H;
 
-    // 스프라이트 이미지 로드
     const imgs: Record<number, HTMLImageElement> = {
       [DIR.DOWN]: new Image(),
       [DIR.LEFT]: new Image(),
@@ -88,7 +84,6 @@ const Character = ({ grid }: CharacterProps) => {
     imgs[DIR.UP_LEFT].src = upLeftPng;
     imgs[DIR.UP_RIGHT].src = upRightPng;
 
-    // 상태
     const state = {
       px: 0,
       py: 0,
@@ -108,11 +103,16 @@ const Character = ({ grid }: CharacterProps) => {
       },
       spaceHeld: false,
       effects: [] as { x: number; y: number; t: number; life: number }[],
+
+      // ▼ 추가: 체력/무적
+      hp: 3,
+      maxHP: 3,
+      invincibleUntil: 0,      // ms 타임스탬프
+      blinkPhase: 0,           // 깜빡임 위상
     };
 
-    // ✅ 스폰 지점: 벽/장애물(길 아님)을 피해서 랜덤 선택
     {
-      const spawn = findSpawnPoint(grid, { clearance: 0 }); // 넓은 자리 선호하면 1
+      const spawn = findSpawnPoint(grid, { clearance: 0 });
       state.px = spawn.x;
       state.py = spawn.y;
     }
@@ -122,7 +122,6 @@ const Character = ({ grid }: CharacterProps) => {
       state.effects.push({ x: state.px, y: state.py, t: 0, life: 0.35 });
     };
 
-    // 입력 처리
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.code === "Space") {
         e.preventDefault();
@@ -153,7 +152,22 @@ const Character = ({ grid }: CharacterProps) => {
     document.addEventListener("keydown", onKeyDown);
     document.addEventListener("keyup", onKeyUp);
 
-    // 방향 계산
+    // ▼ 추가: 피격 이벤트 리스너
+    const onPlayerHit = (e: Event) => {
+      const ce = e as CustomEvent<{ dmg?: number }>;
+      if (state.hp <= 0) return;
+      const now = performance.now();
+      if (now < state.invincibleUntil) return;
+      const dmg = Math.max(1, Math.floor(ce.detail?.dmg ?? 1));
+      state.hp = Math.max(0, state.hp - dmg);
+      state.invincibleUntil = now + 800; // 0.8s i-frames
+      console.log(`[HP] ${state.hp}/${state.maxHP}`);
+      if (state.hp === 0) {
+        window.dispatchEvent(new CustomEvent("player-dead"));
+      }
+    };
+    window.addEventListener("player-hit", onPlayerHit as EventListener);
+
     const octantToDir: DirType[] = [
       DIR.LEFT,
       DIR.DOWN_LEFT,
@@ -177,7 +191,6 @@ const Character = ({ grid }: CharacterProps) => {
       const dt = Math.min(0.033, (t - state.lastTime) / 1000);
       state.lastTime = t;
 
-      // 입력 → 속도
       const upK = state.key.ArrowUp || state.key.w;
       const dnK = state.key.ArrowDown || state.key.s;
       const lfK = state.key.ArrowLeft || state.key.a;
@@ -210,15 +223,12 @@ const Character = ({ grid }: CharacterProps) => {
         state.accAnim = 0;
       }
 
-      // ✅ 이동/충돌: 공용 래퍼 호출 (type.ts에 규칙 통합)
       const moved = moveWithWorldCollision(state.px, state.py, vx, vy, dt, grid);
       state.px = moved.x;
       state.py = moved.y;
-      
+
       window.dispatchEvent(new CustomEvent("player-pos", { detail: { x: state.px, y: state.py } }));
 
-
-      // 렌더: py(발 라인)에 스프라이트 아래끝을 맞춤
       const img = imgs[state.dir];
       const frameW = img.naturalWidth > 0 ? Math.floor(img.naturalWidth / FRAMES) : 64;
       const frameH = img.naturalHeight > 0 ? img.naturalHeight : 64;
@@ -231,11 +241,21 @@ const Character = ({ grid }: CharacterProps) => {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       ctx.imageSmoothingEnabled = false;
 
-      const sx = (state.frame % FRAMES) * frameW;
-      const sy = 0;
-      ctx.drawImage(img, sx, sy, frameW, frameH, destX, destY, destW, destH);
+      // ▼ 추가: 무적 깜빡임. 렌더 토글만. 로직 변경 없음.
+      let skipDraw = false;
+      if (state.invincibleUntil > performance.now()) {
+        state.blinkPhase += dt * 20;
+        skipDraw = Math.floor(state.blinkPhase) % 2 === 0;
+      } else {
+        state.blinkPhase = 0;
+      }
 
-      // (선택) 이펙트 유지
+      if (!skipDraw) {
+        const sx = (state.frame % FRAMES) * frameW;
+        const sy = 0;
+        ctx.drawImage(img, sx, sy, frameW, frameH, destX, destY, destW, destH);
+      }
+
       for (let i = state.effects.length - 1; i >= 0; i--) {
         const e = state.effects[i];
         e.t += dt;
@@ -258,7 +278,6 @@ const Character = ({ grid }: CharacterProps) => {
       raf = requestAnimationFrame(loop);
     };
 
-    // 이미지 로딩 카운트
     let loaded = 0;
     const tryStart = () => {
       loaded++;
@@ -274,6 +293,7 @@ const Character = ({ grid }: CharacterProps) => {
       cancelAnimationFrame(raf);
       document.removeEventListener("keydown", onKeyDown);
       document.removeEventListener("keyup", onKeyUp);
+      window.removeEventListener("player-hit", onPlayerHit as EventListener);
     };
   }, [grid]);
 

@@ -5,6 +5,8 @@ import tileset from "../../assets/Dungeon_Tileset.png";
 import Chaser from "../../component/mob/Chaser";
 import Character from "../../component/mob/Character";
 import Runner from "../../component/mob/Runner";
+import Vision from "../../component/Map/Vision";
+
 
 
 import "./Map.css";
@@ -148,6 +150,7 @@ const Map = ({ grid }: MapProps) => {
       <Character grid={grid} />
       <Chaser grid={grid} />
       <Runner grid={grid} />
+      <Vision radius={200} feather={90} />
 
     </div>
   );
