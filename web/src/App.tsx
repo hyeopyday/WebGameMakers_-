@@ -5,12 +5,17 @@ import MainMenu from "./component/MainMenu/MainMenu";
 import { type Mode } from "./type/numberBaseball";
 
 function App() {
-  const [difficulty, setDifficulty] = useState<Mode>(3);
+  const [difficulty, setDifficulty] = useState<Mode>(1);
   const [gameStarted, setGameStarted] = useState(false);
 
-  const handleStartGame = (mode : Mode) => {
+  const handleStartGame = (mode: Mode) => {
     setDifficulty(mode);
     setGameStarted(true);
+  };
+
+  const handleMainMenu = () => {
+    setGameStarted(false);
+    setDifficulty(1);
   };
 
   return (
@@ -18,7 +23,7 @@ function App() {
       {!gameStarted ? (
         <MainMenu onStartGame={handleStartGame} />
       ) : (
-        <Agency difficulty={difficulty!} />
+        <Agency difficulty={difficulty} onMainMenu={handleMainMenu} />
       )}
     </div>
   );

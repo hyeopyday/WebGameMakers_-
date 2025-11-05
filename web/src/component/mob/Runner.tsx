@@ -13,7 +13,9 @@ import { moveWithWorldCollision } from "./Physic/Physic";
 import runnerPng from "../../assets/Runner.png";
 
 interface RunnerProps {
-  grid: Cell[][]; paused?: boolean;}
+  grid: Cell[][]; 
+  paused?: boolean;
+}
 
 const RUNNER_SPEED = 175;
 const CELL_SIZE = TILE_SIZE * SCALE;
@@ -30,8 +32,15 @@ const SPRITE_H = 16;
 const SPRITE_SCALE = 2;
 const FRAMES = 1;
 const ANIM_FPS = 8;
-const COLLIDE_RADIUS = 20;       // 픽셀 반경 (원하는 값으로 조정 가능)
-const COLLIDE_COOLDOWN = 0.8;    // 초단위 쿨다운 (연속 발동 방지)
+const COLLIDE_RADIUS = 20;
+const COLLIDE_COOLDOWN = 0.8;
+
+// ✅ 위치 유지를 위한 전역 상태
+let globalRunnerState: {
+  px: number;
+  py: number;
+  initialized: boolean;
+} | null = null;
 
 function clamp(n: number, lo: number, hi: number) {
   return Math.max(lo, Math.min(hi, n));
@@ -136,6 +145,7 @@ function pickEscapePath(
 
 const Runner = ({ grid, paused }: RunnerProps) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -170,13 +180,19 @@ const Runner = ({ grid, paused }: RunnerProps) => {
       lastPlayerPos: { x: 0, y: 0 },
       lastPdist: Number.POSITIVE_INFINITY,
       preferLeft: true,
-
       collideCd: 0,
     };
 
-    const s = findSpawnPoint(grid, { clearance: 0 });
-    state.px = s.x;
-    state.py = s.y;
+    // ✅ 최초 한 번만 스폰
+    if (!globalRunnerState || !globalRunnerState.initialized) {
+      const s = findSpawnPoint(grid, { clearance: 0 });
+      state.px = s.x;
+      state.py = s.y;
+      globalRunnerState = { px: s.x, py: s.y, initialized: true };
+    } else {
+      state.px = globalRunnerState.px;
+      state.py = globalRunnerState.py;
+    }
 
     const onPlayerPos = (e: Event) => {
       const ce = e as CustomEvent<{ x: number; y: number }>;
@@ -185,6 +201,60 @@ const Runner = ({ grid, paused }: RunnerProps) => {
       state.havePlayer = true;
     };
     window.addEventListener("player-pos", onPlayerPos as EventListener);
+
+    // ✅ 몹 재배치 이벤트 리스너
+    const onRepositionMobs = () => {
+      // 플레이어 반대 끝 방향으로 이동
+      const WORLD_W = MAP_WIDTH * TILE_SIZE * SCALE;
+      const WORLD_H = MAP_HEIGHT * TILE_SIZE * SCALE;
+      
+      // 플레이어가 왼쪽에 있으면 오른쪽으로, 위에 있으면 아래로
+      const targetCellX = state.targetX < WORLD_W / 2 
+        ? Math.floor(MAP_WIDTH * 0.8) 
+        : Math.floor(MAP_WIDTH * 0.2);
+      const targetCellY = state.targetY < WORLD_H / 2 
+        ? Math.floor(MAP_HEIGHT * 0.8) 
+        : Math.floor(MAP_HEIGHT * 0.2);
+      
+      // 해당 셀이 벽이면 근처에서 길 찾기
+      let foundX = targetCellX;
+      let foundY = targetCellY;
+      let found = false;
+      
+      // 주변 탐색
+      for (let radius = 0; radius < 10 && !found; radius++) {
+        for (let dy = -radius; dy <= radius && !found; dy++) {
+          for (let dx = -radius; dx <= radius && !found; dx++) {
+            const checkX = targetCellX + dx;
+            const checkY = targetCellY + dy;
+            if (checkX >= 0 && checkX < MAP_WIDTH && checkY >= 0 && checkY < MAP_HEIGHT) {
+              if (grid[checkY][checkX] !== WALL) {
+                foundX = checkX;
+                foundY = checkY;
+                found = true;
+              }
+            }
+          }
+        }
+      }
+      
+      // 새 위치 설정
+      state.px = (foundX + 0.5) * CELL_SIZE;
+      state.py = (foundY + 1) * CELL_SIZE;
+      
+      // 전역 상태 업데이트
+      if (globalRunnerState) {
+        globalRunnerState.px = state.px;
+        globalRunnerState.py = state.py;
+      }
+      
+      // 경로 초기화
+      state.path = [];
+      state.mode = "idle";
+      
+      console.log(`Runner repositioned to opposite corner: (${foundX}, ${foundY})`);
+    };
+    window.addEventListener("reposition-mobs", onRepositionMobs as EventListener);
 
     let raf = 0;
 
@@ -219,7 +289,6 @@ const Runner = ({ grid, paused }: RunnerProps) => {
       const dt = Math.min(0.033, (t - state.lastTime) / 1000);
       state.lastTime = t;
 
-      /// 추가한 부분 
       if (paused) {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         ctx.imageSmoothingEnabled = false;
@@ -236,13 +305,12 @@ const Runner = ({ grid, paused }: RunnerProps) => {
           );
         }
         raf = requestAnimationFrame(loop);
-        return; // ✅ 이동/충돌/경로/쿨다운 갱신 모두 막음
+        return;
       }
 
       state.pathTimer += dt;
       if (state.goalLock > 0) state.goalLock -= dt;
       if (state.collideCd > 0) state.collideCd -= dt;
-
 
       const pdx = state.targetX - state.px;
       const pdy = state.targetY - state.py;
@@ -253,14 +321,11 @@ const Runner = ({ grid, paused }: RunnerProps) => {
 
       if (state.havePlayer && pdist <= COLLIDE_RADIUS && state.collideCd <= 0) {
         state.collideCd = COLLIDE_COOLDOWN;
-
-        // 숫자야구 실행을 외부에 알림 (글로벌 이벤트)
         window.dispatchEvent(new CustomEvent("enemyA-collide"));
-      
-        // 몹은 도망가기 모드 유지하도록 약간의 보정(옵션)
         state.mode = "escape";
         state.pathTimer = PATH_RECALC_TIME;
       }
+
       const pcx = Math.floor(state.targetX / CELL_SIZE);
       const pcy = Math.floor(state.targetY / CELL_SIZE);
       const playerMovedCell = pcx !== state.lastPlayerCell.x || pcy !== state.lastPlayerCell.y;
@@ -301,6 +366,13 @@ const Runner = ({ grid, paused }: RunnerProps) => {
           const moved = moveWithWorldCollision(state.px, state.py, vx, vy, dt, grid);
           state.px = clamp(moved.x, 0, WORLD_W);
           state.py = clamp(moved.y, 0, WORLD_H);
+
+          // ✅ 전역 상태 업데이트
+          if (globalRunnerState) {
+            globalRunnerState.px = state.px;
+            globalRunnerState.py = state.py;
+          }
+
           window.dispatchEvent(new CustomEvent("runner-pos", { detail: { x: state.px, y: state.py } }));
         }
       } else if (state.mode === "escape" && pdist < ESCAPE_KEEP) {
@@ -334,14 +406,13 @@ const Runner = ({ grid, paused }: RunnerProps) => {
       raf = requestAnimationFrame(loop);
     };
 
-    // 최초 위치도 즉시 한 번 알림
     window.dispatchEvent(new CustomEvent("runner-pos", { detail: { x: state.px, y: state.py } }));
-
     raf = requestAnimationFrame(loop);
 
     return () => {
       cancelAnimationFrame(raf);
       window.removeEventListener("player-pos", onPlayerPos as EventListener);
+      window.removeEventListener("reposition-mobs", onRepositionMobs as EventListener);
     };
   }, [grid, paused]);
 
@@ -353,4 +424,5 @@ const Runner = ({ grid, paused }: RunnerProps) => {
     />
   );
 };
+
 export default Runner;
