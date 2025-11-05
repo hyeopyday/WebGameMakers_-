@@ -11,13 +11,13 @@ import {
 } from "../../type/type";
 import { moveWithWorldCollision } from "./Physic/Physic";
 import enemyPng from "../../assets/Chaser.png";
+import { DIFFICULTY, getCurrentMode } from "../../type/difficulty";
 
 interface ChaserProps {
-  grid: Cell[][]; paused?: boolean;}
+  grid: Cell[][];
+  paused?: boolean;
+}
 
-const CHASER_SPEED = 170;
-const PATH_RECALC_TIME = 0.3;
-const ATTACK_RANGE = 25;
 const ATTACK_FREEZE = 0.4;
 const SPRITE_W = 32;
 const SPRITE_H = 32;
@@ -25,9 +25,6 @@ const SPRITE_SCALE = 2;
 const FRAMES = 4;
 const ANIM_FPS = 8;
 const CELL_SIZE = TILE_SIZE * SCALE;
-
-// ▼ 추가: 공격 쿨다운
-const ATTACK_COOLDOWN = 0.9;
 
 function findPath(
   grid: Cell[][],
@@ -90,6 +87,14 @@ function findPath(
 const Chaser = ({ grid, paused }: ChaserProps) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
+  // 중앙에서 설정된 난이도 읽기
+  const mode = getCurrentMode();
+  const { chaser } = DIFFICULTY[mode];
+  const CHASER_SPEED = chaser.speed;
+  const PATH_RECALC_TIME = chaser.pathRecalc;
+  const ATTACK_RANGE = chaser.attackRange;
+  const ATTACK_COOLDOWN = chaser.cooldown;
+
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -120,9 +125,7 @@ const Chaser = ({ grid, paused }: ChaserProps) => {
       accAnim: 0,
       mode: "idle" as "idle" | "attack",
       attackFreeze: 0,
-      // ▼ 추가: 공격 쿨다운
       attackCD: 0,
-
       path: [] as { x: number; y: number }[],
       pathTimer: 0,
       targetX: 0,
@@ -153,19 +156,18 @@ const Chaser = ({ grid, paused }: ChaserProps) => {
       if (paused) {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         ctx.imageSmoothingEnabled = false;
-    
+
         const dirOffset = state.dir * SPRITE_H;
         const animRow =
           state.mode === "attack"
             ? 4 * SPRITE_H + dirOffset
             : 0 * SPRITE_H + dirOffset;
-    
+
         const sx = state.frame * SPRITE_W;
         const sy = animRow;
-    
         const destW = SPRITE_W * SPRITE_SCALE;
         const destH = SPRITE_H * SPRITE_SCALE;
-    
+
         ctx.drawImage(
           enemyImg,
           sx, sy, SPRITE_W, SPRITE_H,
@@ -173,20 +175,19 @@ const Chaser = ({ grid, paused }: ChaserProps) => {
           state.py - destH,
           destW, destH
         );
-    
+
         raf = requestAnimationFrame(loop);
-        return; // ✅ 아래 로직(경로/이동/공격/쿨다운 감소 등) 전부 스킵
+        return;
       }
+
       state.pathTimer += dt;
 
-      // ▼ 쿨다운 감소
       if (state.attackCD > 0) state.attackCD = Math.max(0, state.attackCD - dt);
 
       const dx = state.targetX - state.px;
       const dy = state.targetY - state.py;
       const dist = Math.hypot(dx, dy);
 
-      // 상태 전환
       if (dist < ATTACK_RANGE && state.mode !== "attack") {
         state.mode = "attack";
         state.attackFreeze = ATTACK_FREEZE;
@@ -196,20 +197,17 @@ const Chaser = ({ grid, paused }: ChaserProps) => {
 
       if (state.attackFreeze > 0) state.attackFreeze -= dt;
 
-      // ▼ 공격 판정: 사정거리 + 쿨다운 여유
       if (dist < ATTACK_RANGE && state.attackCD <= 0) {
         window.dispatchEvent(new CustomEvent("player-hit", { detail: { dmg: 1 } }));
         state.attackCD = ATTACK_COOLDOWN;
       }
 
-      // 방향 계산
       if (Math.abs(dx) > Math.abs(dy)) {
         state.dir = dx > 0 ? 2 : 1;
       } else {
         state.dir = dy > 0 ? 0 : 3;
       }
 
-      // 경로 갱신
       if (state.havePlayer && state.pathTimer >= PATH_RECALC_TIME) {
         const sx = Math.floor(state.px / CELL_SIZE);
         const sy = Math.floor(state.py / CELL_SIZE);
@@ -220,7 +218,6 @@ const Chaser = ({ grid, paused }: ChaserProps) => {
         state.pathTimer = 0;
       }
 
-      // 이동 (공격 중엔 잠시 멈춤)
       if (state.attackFreeze <= 0 && state.path.length > 0) {
         const next = state.path[0];
         const tx = next.x * CELL_SIZE + CELL_SIZE / 2;
@@ -238,14 +235,12 @@ const Chaser = ({ grid, paused }: ChaserProps) => {
         }
       }
 
-      // 애니메이션
       state.accAnim += dt;
       if (state.accAnim >= 1 / ANIM_FPS) {
         state.frame = (state.frame + 1) % FRAMES;
         state.accAnim = 0;
       }
 
-      // 렌더링
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       ctx.imageSmoothingEnabled = false;
 
@@ -254,10 +249,8 @@ const Chaser = ({ grid, paused }: ChaserProps) => {
         state.mode === "attack"
           ? 4 * SPRITE_H + dirOffset
           : 0 * SPRITE_H + dirOffset;
-
       const sx = state.frame * SPRITE_W;
       const sy = animRow;
-
       const destW = SPRITE_W * SPRITE_SCALE;
       const destH = SPRITE_H * SPRITE_SCALE;
 
@@ -278,7 +271,7 @@ const Chaser = ({ grid, paused }: ChaserProps) => {
       cancelAnimationFrame(raf);
       window.removeEventListener("player-pos", onPlayerPos as EventListener);
     };
-  }, [grid, paused]);
+  }, [grid, paused, mode]);
 
   return (
     <canvas

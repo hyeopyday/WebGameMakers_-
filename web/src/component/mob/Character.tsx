@@ -1,4 +1,3 @@
-// FILE: src/components/Character.tsx
 import { useEffect, useRef } from "react";
 import downPng from "../../assets/character_up.png";
 import leftPng from "../../assets/character_left.png";
@@ -21,11 +20,12 @@ import {
   findSpawnPoint
 } from "../../type/type";
 import { moveWithWorldCollision } from "./Physic/Physic";
+import { DIFFICULTY } from "../../type/difficulty";
 
 const FRAMES = 4;
 
 interface CharacterProps {
-  grid: Cell[][]; 
+  grid: Cell[][];
   paused?: boolean;
 }
 
@@ -50,7 +50,6 @@ const Character = ({ grid, paused }: CharacterProps) => {
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
-
     if (!grid?.length || !grid[0]?.length) return;
 
     canvas.style.position = "absolute";
@@ -65,6 +64,16 @@ const Character = ({ grid, paused }: CharacterProps) => {
     const WORLD_H = MAP_HEIGHT * TILE_SIZE * SCALE;
     canvas.width = WORLD_W;
     canvas.height = WORLD_H;
+
+    let diff = DIFFICULTY[1];
+
+    const onDiff = (e: Event) => {
+      const ce = e as CustomEvent<{ mode: number; config: typeof diff }>;
+      diff = ce.detail.config;
+      state.maxHP = diff.player.hp;
+      if (state.hp > state.maxHP) state.hp = state.maxHP;
+    };
+    window.addEventListener("difficulty-set", onDiff as EventListener);
 
     const imgs: Record<number, HTMLImageElement> = {
       [DIR.DOWN]: new Image(),
@@ -104,12 +113,10 @@ const Character = ({ grid, paused }: CharacterProps) => {
       },
       spaceHeld: false,
       effects: [] as { x: number; y: number; t: number; life: number }[],
-
-      // ▼ 추가: 체력/무적
-      hp: 3,
-      maxHP: 3,
-      invincibleUntil: 0,      // ms 타임스탬프
-      blinkPhase: 0,           // 깜빡임 위상
+      hp: diff.player.hp,
+      maxHP: diff.player.hp,
+      invincibleUntil: 0,
+      blinkPhase: 0,
     };
 
     {
@@ -124,7 +131,7 @@ const Character = ({ grid, paused }: CharacterProps) => {
     };
 
     const onKeyDown = (e: KeyboardEvent) => {
-      if (paused) { e.preventDefault(); return; }   // ✅ 추가
+      if (paused) { e.preventDefault(); return; }
       if (e.code === "Space") {
         e.preventDefault();
         if (!state.spaceHeld) {
@@ -139,9 +146,9 @@ const Character = ({ grid, paused }: CharacterProps) => {
         state.key[k] = true;
       }
     };
-    
+
     const onKeyUp = (e: KeyboardEvent) => {
-      if (paused) { e.preventDefault(); return; }   // ✅ 추가
+      if (paused) { e.preventDefault(); return; }
       if (e.code === "Space") {
         state.spaceHeld = false;
         return;
@@ -152,12 +159,10 @@ const Character = ({ grid, paused }: CharacterProps) => {
         state.key[k] = false;
       }
     };
-    
 
     document.addEventListener("keydown", onKeyDown);
     document.addEventListener("keyup", onKeyUp);
 
-    // ▼ 추가: 피격 이벤트 리스너
     const onPlayerHit = (e: Event) => {
       const ce = e as CustomEvent<{ dmg?: number }>;
       if (state.hp <= 0) return;
@@ -165,11 +170,8 @@ const Character = ({ grid, paused }: CharacterProps) => {
       if (now < state.invincibleUntil) return;
       const dmg = Math.max(1, Math.floor(ce.detail?.dmg ?? 1));
       state.hp = Math.max(0, state.hp - dmg);
-      state.invincibleUntil = now + 800; // 0.8s i-frames
-      console.log(`[HP] ${state.hp}/${state.maxHP}`);
-      if (state.hp === 0) {
-        window.dispatchEvent(new CustomEvent("player-dead"));
-      }
+      state.invincibleUntil = now + diff.player.invincibleMs;
+      if (state.hp === 0) window.dispatchEvent(new CustomEvent("player-dead"));
     };
     window.addEventListener("player-hit", onPlayerHit as EventListener);
 
@@ -195,8 +197,7 @@ const Character = ({ grid, paused }: CharacterProps) => {
       if (!state.lastTime) state.lastTime = t;
       const dt = Math.min(0.033, (t - state.lastTime) / 1000);
       state.lastTime = t;
-    
-      // 렌더에 필요한 값 미리 계산
+
       const img = imgs[state.dir];
       const frameW = img.naturalWidth > 0 ? Math.floor(img.naturalWidth / FRAMES) : 64;
       const frameH = img.naturalHeight > 0 ? img.naturalHeight : 64;
@@ -204,13 +205,11 @@ const Character = ({ grid, paused }: CharacterProps) => {
       const destH = frameH * SPRITE_SCALE;
       const destX = Math.floor(state.px - destW / 2);
       const destY = Math.floor(state.py - destH);
-    
-      // ✅ 일시정지: 입력/이동/애니메이션/이펙트 계산 스킵, 현재 프레임만 그리기
+
       if (paused) {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         ctx.imageSmoothingEnabled = false;
-    
-        // (옵션) 무적 깜빡임은 유지
+
         let skipDraw = false;
         if (state.invincibleUntil > performance.now()) {
           state.blinkPhase += dt * 20;
@@ -218,38 +217,37 @@ const Character = ({ grid, paused }: CharacterProps) => {
         } else {
           state.blinkPhase = 0;
         }
-    
+
         if (!skipDraw) {
           const sx = (state.frame % FRAMES) * frameW;
           const sy = 0;
           ctx.drawImage(img, sx, sy, frameW, frameH, destX, destY, destW, destH);
         }
-    
+
         raf = requestAnimationFrame(loop);
-        return; // ⬅️ 아래 로직 모두 정지
+        return;
       }
-    
-      // ⬇️ 여기부터 기존 로직 유지
+
       const upK = state.key.ArrowUp || state.key.w;
       const dnK = state.key.ArrowDown || state.key.s;
       const lfK = state.key.ArrowLeft || state.key.a;
       const rtK = state.key.ArrowRight || state.key.d;
-    
+
       let vx = 0, vy = 0;
       if (upK) vy -= 1;
       if (dnK) vy += 1;
       if (lfK) vx -= 1;
       if (rtK) vx += 1;
-    
+
       if (vx !== 0 || vy !== 0) {
         const len = Math.hypot(vx, vy);
         vx = (vx / len) * MOVE_SPEED;
         vy = (vy / len) * MOVE_SPEED;
-    
+
         const theta = Math.atan2(vy, vx);
         const oct = angleToOctant(theta);
         state.dir = octantToDir[oct];
-    
+
         state.accAnim += dt;
         if (state.accAnim >= 1 / ANIM_FPS) {
           state.frame = (state.frame + 1) % FRAMES;
@@ -261,17 +259,16 @@ const Character = ({ grid, paused }: CharacterProps) => {
         state.frame = 0;
         state.accAnim = 0;
       }
-    
+
       const moved = moveWithWorldCollision(state.px, state.py, vx, vy, dt, grid);
       state.px = moved.x;
       state.py = moved.y;
-    
+
       window.dispatchEvent(new CustomEvent("player-pos", { detail: { x: state.px, y: state.py } }));
-    
+
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       ctx.imageSmoothingEnabled = false;
-    
-      // 무적 깜빡임
+
       let skipDraw = false;
       if (state.invincibleUntil > performance.now()) {
         state.blinkPhase += dt * 20;
@@ -279,13 +276,13 @@ const Character = ({ grid, paused }: CharacterProps) => {
       } else {
         state.blinkPhase = 0;
       }
-    
+
       if (!skipDraw) {
         const sx = (state.frame % FRAMES) * frameW;
         const sy = 0;
         ctx.drawImage(img, sx, sy, frameW, frameH, destX, destY, destW, destH);
       }
-    
+
       for (let i = state.effects.length - 1; i >= 0; i--) {
         const e = state.effects[i];
         e.t += dt;
@@ -304,10 +301,9 @@ const Character = ({ grid, paused }: CharacterProps) => {
         ctx.stroke();
         ctx.restore();
       }
-    
+
       raf = requestAnimationFrame(loop);
     };
-    
 
     let loaded = 0;
     const tryStart = () => {
@@ -325,6 +321,7 @@ const Character = ({ grid, paused }: CharacterProps) => {
       document.removeEventListener("keydown", onKeyDown);
       document.removeEventListener("keyup", onKeyUp);
       window.removeEventListener("player-hit", onPlayerHit as EventListener);
+      window.removeEventListener("difficulty-set", onDiff as EventListener);
     };
   }, [grid, paused]);
 

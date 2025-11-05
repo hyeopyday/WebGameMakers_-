@@ -11,6 +11,7 @@ import {
 } from "../../type/type";
 import { moveWithWorldCollision } from "./Physic/Physic";
 import runnerPng from "../../assets/Runner.png";
+import { DIFFICULTY } from "../../type/difficulty";
 
 interface RunnerProps {
   grid: Cell[][]; paused?: boolean;}
@@ -20,9 +21,9 @@ const CELL_SIZE = TILE_SIZE * SCALE;
 const PATH_RECALC_TIME = 0.35;
 const SAFE_INNER = 300;
 const SAFE_OUTER = 1040;
-const ESCAPE_KEEP = 1280;
+const ESCAPE_KEEP_DEFAULT = 1280;
 const GOAL_LOCK_TIME = 0.2;
-const PANIC_RECALC_DIST = SAFE_INNER;
+const PANIC_RECALC_DIST_DEFAULT = SAFE_INNER;
 const PLAYER_PIXEL_TRIGGER = 24;
 
 const SPRITE_W = 16;
@@ -30,8 +31,8 @@ const SPRITE_H = 16;
 const SPRITE_SCALE = 2;
 const FRAMES = 1;
 const ANIM_FPS = 8;
-const COLLIDE_RADIUS = 20;       // 픽셀 반경 (원하는 값으로 조정 가능)
-const COLLIDE_COOLDOWN = 0.8;    // 초단위 쿨다운 (연속 발동 방지)
+const COLLIDE_RADIUS_DEFAULT = 20;
+const COLLIDE_COOLDOWN = 0.8;
 
 function clamp(n: number, lo: number, hi: number) {
   return Math.max(lo, Math.min(hi, n));
@@ -158,6 +159,13 @@ const Runner = ({ grid, paused }: RunnerProps) => {
     const img = new Image();
     img.src = runnerPng;
 
+    let diff = DIFFICULTY[1];
+    const onDiff = (e: Event) => {
+      const ce = e as CustomEvent<{ mode: number; config: typeof diff }>;
+      diff = ce.detail.config;
+    };
+    window.addEventListener("difficulty-set", onDiff as EventListener);
+
     const state = {
       px: 0, py: 0, frame: 0, accAnim: 0,
       path: [] as { x: number; y: number }[],
@@ -195,7 +203,7 @@ const Runner = ({ grid, paused }: RunnerProps) => {
       const pdx = state.targetX - state.px;
       const pdy = state.targetY - state.py;
       const pdist = Math.hypot(pdx, pdy);
-      if ((!newPath.length || pdist < ESCAPE_KEEP) && pdist > 1e-6) {
+      if ((!newPath.length || pdist < (diff.runner.escapeKeep ?? ESCAPE_KEEP_DEFAULT)) && pdist > 1e-6) {
         const ux = (state.px - state.targetX) / pdist;
         const uy = (state.py - state.targetY) / pdist;
         const farCells = 32;
@@ -219,7 +227,11 @@ const Runner = ({ grid, paused }: RunnerProps) => {
       const dt = Math.min(0.033, (t - state.lastTime) / 1000);
       state.lastTime = t;
 
-      /// 추가한 부분 
+      const RUN_SPEED = diff.runner.speed ?? RUNNER_SPEED;
+      const COLLIDE_RADIUS = diff.runner.collideRadius ?? COLLIDE_RADIUS_DEFAULT;
+      const PANIC_RECALC_DIST = diff.runner.panicDist ?? PANIC_RECALC_DIST_DEFAULT;
+      const ESCAPE_KEEP = diff.runner.escapeKeep ?? ESCAPE_KEEP_DEFAULT;
+
       if (paused) {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         ctx.imageSmoothingEnabled = false;
@@ -236,7 +248,7 @@ const Runner = ({ grid, paused }: RunnerProps) => {
           );
         }
         raf = requestAnimationFrame(loop);
-        return; // ✅ 이동/충돌/경로/쿨다운 갱신 모두 막음
+        return;
       }
 
       state.pathTimer += dt;
@@ -248,16 +260,12 @@ const Runner = ({ grid, paused }: RunnerProps) => {
       const pdy = state.targetY - state.py;
       const pdist = Math.hypot(pdx, pdy);
 
-      if (state.mode === "idle" && pdist < SAFE_INNER) state.mode = "escape";
+      if (state.mode === "idle" && pdist < PANIC_RECALC_DIST) state.mode = "escape";
       else if (state.mode === "escape" && pdist > SAFE_OUTER) state.mode = "idle";
 
       if (state.havePlayer && pdist <= COLLIDE_RADIUS && state.collideCd <= 0) {
         state.collideCd = COLLIDE_COOLDOWN;
-
-        // 숫자야구 실행을 외부에 알림 (글로벌 이벤트)
         window.dispatchEvent(new CustomEvent("enemyA-collide"));
-      
-        // 몹은 도망가기 모드 유지하도록 약간의 보정(옵션)
         state.mode = "escape";
         state.pathTimer = PATH_RECALC_TIME;
       }
@@ -296,8 +304,8 @@ const Runner = ({ grid, paused }: RunnerProps) => {
           state.path.shift();
         } else {
           const denom = Math.max(d2, 1e-6);
-          const vx = (ndx / denom) * RUNNER_SPEED;
-          const vy = (ndy / denom) * RUNNER_SPEED;
+          const vx = (ndx / denom) * RUN_SPEED;
+          const vy = (ndy / denom) * RUN_SPEED;
           const moved = moveWithWorldCollision(state.px, state.py, vx, vy, dt, grid);
           state.px = clamp(moved.x, 0, WORLD_W);
           state.py = clamp(moved.y, 0, WORLD_H);
@@ -334,7 +342,6 @@ const Runner = ({ grid, paused }: RunnerProps) => {
       raf = requestAnimationFrame(loop);
     };
 
-    // 최초 위치도 즉시 한 번 알림
     window.dispatchEvent(new CustomEvent("runner-pos", { detail: { x: state.px, y: state.py } }));
 
     raf = requestAnimationFrame(loop);
@@ -342,6 +349,7 @@ const Runner = ({ grid, paused }: RunnerProps) => {
     return () => {
       cancelAnimationFrame(raf);
       window.removeEventListener("player-pos", onPlayerPos as EventListener);
+      window.removeEventListener("difficulty-set", onDiff as EventListener);
     };
   }, [grid, paused]);
 

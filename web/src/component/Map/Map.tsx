@@ -1,17 +1,15 @@
-import { useEffect, useRef } from "react";
+// FILE: src/component/Map/Map.tsx
+import { useEffect, useRef, useState } from "react";
 import type { Cell } from "../../type/type";
 import { FLOOR, WALL } from "../../type/type";
 import tileset from "../../assets/Dungeon_Tileset.png";
-import Chaser from "../../component/mob/Chaser";
 import Character from "../../component/mob/Character";
+import Chaser from "../../component/mob/Chaser";
 import Runner from "../../component/mob/Runner";
 import Vision from "../../component/Map/Vision";
 import ArrowOverlay from "../../component/Map/ArrowOverlay";
-
-
-
-
 import "./Map.css";
+import { DIFFICULTY } from "../../type/difficulty";
 
 const TILE_SIZE = 16;
 const SCALE = 2;
@@ -90,21 +88,28 @@ interface MapProps {
 const Map = ({ grid, paused }: MapProps) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const imgRef = useRef<HTMLImageElement | null>(null);
+  const [visionRadius, setVisionRadius] = useState(DIFFICULTY[1].player.vision);
+
+  useEffect(() => {
+    const onDiff = (e: Event) => {
+      const ce = e as CustomEvent<{ mode: number; config: typeof DIFFICULTY[1] }>;
+      setVisionRadius(ce.detail.config.player.vision);
+    };
+    window.addEventListener("difficulty-set", onDiff as EventListener);
+    return () => window.removeEventListener("difficulty-set", onDiff as EventListener);
+  }, []);
 
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
-
-    // grid 준비 전엔 아무것도 하지 않음
     if (!grid?.length || !grid[0]?.length) return;
 
     canvas.width = MAP_WIDTH * TILE_SIZE * SCALE;
     canvas.height = MAP_HEIGHT * TILE_SIZE * SCALE;
 
     let cancelled = false;
-
     const draw = () => {
       if (cancelled) return;
       ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -112,36 +117,21 @@ const Map = ({ grid, paused }: MapProps) => {
       drawTiles(grid, ctx, img);
     };
 
-    // 이미지 1회 초기화 & 재사용
     if (!imgRef.current) {
       const img = new Image();
       img.decoding = "async";
-      // 핸들러 먼저 등록
       img.onload = () => draw();
-      img.onerror = (e) => {
-        console.error("tileset load error", e);
-      };
+      img.onerror = (e) => console.error("tileset load error", e);
       imgRef.current = img;
-      // src 나중에 세팅
       img.src = tileset;
-      // 캐시 히트 보정
-      if (img.complete && img.naturalWidth > 0) {
-        // onload가 이미 지나갔을 수 있으니 직접 그리기
-        requestAnimationFrame(draw);
-      }
+      if (img.complete && img.naturalWidth > 0) requestAnimationFrame(draw);
     } else {
       const img = imgRef.current;
-      if (img.complete && img.naturalWidth > 0) {
-        requestAnimationFrame(draw);
-      } else {
-        // 아직 로딩 중이면 onload에서 그려짐
-        img.onload = () => draw();
-      }
+      if (img.complete && img.naturalWidth > 0) requestAnimationFrame(draw);
+      else img.onload = () => draw();
     }
 
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, [grid]);
 
   return (
@@ -152,12 +142,11 @@ const Map = ({ grid, paused }: MapProps) => {
         width={MAP_WIDTH * TILE_SIZE * SCALE}
         height={MAP_HEIGHT * TILE_SIZE * SCALE}
       />
-       <Character grid={grid} paused={paused} />
-      <Chaser grid={grid} paused={paused} />
       <Runner grid={grid} paused={paused} />
+      <Character grid={grid} paused={paused} />
+      <Chaser grid={grid} paused={paused} />
       <ArrowOverlay minDist={120} maxDist={1200} size={28} ring={36} />
-      <Vision radius={200} feather={90} />
-
+      <Vision radius={visionRadius} feather={90} />
     </div>
   );
 };
