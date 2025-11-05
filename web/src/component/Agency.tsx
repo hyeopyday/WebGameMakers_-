@@ -110,14 +110,14 @@ function Agency({ difficulty }: AgencyProps) {
             <div
                 className="nb-history"
             >
-                <h3 style={{ marginTop: 0, fontSize: "16px", borderBottom: "1px solid #888" }}>
-                    ⚾ Number Baseball
+                <h3>
+                    ⚾ Number Baseball ⚾
                 </h3>
                 {/* 여기에 시도 기록들 출력 */}
                 {history.length === 0 ? (
                     <div style={{ opacity: 0.6 }}>No attempts yet.</div>
                 ) : (
-                    history.map((line, i) => <div key={i}>{line}</div>)
+                    history.map((line, i) => <div className="history"  key={i}>{line}</div>)
                 )}
             </div>
 

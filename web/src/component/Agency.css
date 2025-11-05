@@ -1,9 +1,46 @@
+/* 최상위 래퍼가 flex라고 했으니… */
+#Agency {
+  display: flex;
+  gap: 16px;
+  align-items: stretch;
+}
 
-#Agency  {
-    
+/* 왼쪽: 게임 화면은 남은 공간 전부 */
+#Agency .game-display {
+  flex: 1 1 auto;      /* 가변 */
+  min-width: 0;        /* overflow 방지용 */
+}
+
+/* 오른쪽: 기록 패널은 고정 폭으로 */
+#Agency .nb-history {
+  flex: 0 0 360px;     /* 고정 폭 */
+  max-height: 80vh;
+  overflow: auto;
+
+  background-image: url("../assets/background.png"); /* 🔹여기 수정됨 */
+  background-repeat: no-repeat;
+  background-size: cover;
+  background-position: left;
+
+  border: 1px solid white;
+  border-radius: 12px;
+  padding: 12px;
+  color: white;
 }
 
 
-#Agency .nb-history {
-    width: 10%;
+/* 제목 스타일 조금만 */
+#Agency .nb-history > h3 {
+  margin: 8px 8px 10px;
+  font-size: 16px;
+  border-bottom: 1px solid white;
+  padding-bottom: 6px;
+  color: white;
+}
+
+/* 기록 줄 */
+#Agency .nb-history .history {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  padding: 2px 8px;
+  color: white;
 }

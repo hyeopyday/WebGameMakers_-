@@ -14,7 +14,7 @@ function App() {
   };
 
   return (
-    <div style={{ display: "flex", justifyContent: "center" }}>
+    <div style={{ display: "flex", justifyContent: "center"}}>
       {!gameStarted ? (
         <MainMenu onStartGame={handleStartGame} />
       ) : (
