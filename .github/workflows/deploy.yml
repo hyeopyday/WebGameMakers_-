@@ -3,15 +3,13 @@ name: Deploy Vite → Nginx (via ~/frontEnd)
 on:
   push:
     branches: [ "main" ]
-    paths:
-      - "*"   
 
 jobs:
   deploy-vite:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: frontEnd  
+        working-directory: web
 
     steps:
       - uses: actions/checkout@v4
