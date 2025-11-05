@@ -1,6 +1,6 @@
 // src/ui/NumberBaseball.tsx
 import React, { useEffect, useMemo, useState } from "react";
-import { judgeGuess, validateGuess, formatAttemptLine, MODE_LENGTH, type Mode } from "../../type/numberBaseball";
+import { judgeGuess, validateGuess, formatAttemptLine, type Mode } from "../../type/numberBaseball";
 
 export type NBResult = {
   guess: string;
@@ -119,7 +119,6 @@ export default function NumberBaseball({
   secret,
   attemptIndex1,
   onClose,
-  difficulty
 }: Props) {
   const [picked, setPicked] = useState<string[]>([]);
   const [showWinMessage, setShowWinMessage] = useState(false);
