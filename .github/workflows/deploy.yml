@@ -25,10 +25,31 @@ jobs:
 
       - name: Prepare SSH
         run: |
+          set -e
+
+          # 0) 기본 포트 fallback (비어있으면 22)
+          PORT="${{ secrets.RASP_PORT }}"
+          if [ -z "$PORT" ]; then PORT=22; fi
+
+          # 1) 개인키 저장 (줄바꿈 보존)
           mkdir -p ~/.ssh
-          echo "${{ secrets.RASP_SSH_KEY }}" > ~/.ssh/id_ed25519
+          printf '%s\n' "${{ secrets.RASP_SSH_KEY }}" > ~/.ssh/id_ed25519
           chmod 600 ~/.ssh/id_ed25519
-          ssh-keyscan -H "${{ secrets.RASP_HOST }}" >> ~/.ssh/known_hosts
+
+          # 2) known_hosts 등록 (포트 지정 + 실패해도 빌드 중단 X)
+          (ssh-keyscan -p "$PORT" -H "${{ secrets.RASP_HOST }}" 2>/dev/null >> ~/.ssh/known_hosts) || true
+
+          # 3) SSH config 작성(호스트별 설정) → 이후부터는 'ssh deploy_target'로 접속 가능
+          cat > ~/.ssh/config <<EOF
+          Host deploy_target
+              HostName ${{ secrets.RASP_HOST }}
+              User ${{ secrets.RASP_USER }}
+              Port $PORT
+              IdentityFile ~/.ssh/id_ed25519
+              IdentitiesOnly yes
+              StrictHostKeyChecking accept-new
+          EOF
+              chmod 600 ~/.ssh/config
 
       # 1) 원격: ~/frontEnd 를 매번 초기화
       - name: Clean ~/frontEnd on server
