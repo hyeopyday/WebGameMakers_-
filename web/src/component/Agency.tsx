@@ -12,9 +12,9 @@ interface AgencyProps {
 }
 
 function Agency({ difficulty }: AgencyProps) {
-    const [mode, setMode] = useState<1 | 2 | 3>(1);
+    const [mode] = useState<1 | 2 | 3>(1);
     const length = MODE_LENGTH[mode];
-    const [secret, setSecret] = useState(() => generateSecret(length));
+    const [secret] = useState(() => generateSecret(length));
 
     const [isPaused, setPaused] = useState(false);
     const [nbOpen, setNbOpen] = useState(false);

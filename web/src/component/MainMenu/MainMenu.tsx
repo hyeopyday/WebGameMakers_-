@@ -25,7 +25,7 @@ const MainMenu = ({ onStartGame }: MainMenuProps) => {
   const [showGameInfo, setShowGameInfo] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [isClosing, setIsClosing] = useState(false);
-  const [brightness, setBrightness] = useState(100);
+  const [brightness] = useState(100);
   const [bgmVolume, setBgmVolume] = useState(15);
   const [sfxVolume, setSfxVolume] = useState(15);
   const [isFullscreen, setIsFullscreen] = useState(false);
