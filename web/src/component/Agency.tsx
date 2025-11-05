@@ -10,16 +10,16 @@ import { createGrid, carveMazeDFS, addSmallRooms, carveHighways, braidDeadEnds, 
 import { type Cell, MAP_WIDTH, MAP_HEIGHT } from "../type/type";
 import Map from "./Map/Map";
 import { type Mode } from "../type/numberBaseball";
-
+import "./Agency.css";
+// ... Map import 등
 interface AgencyProps {
-  difficulty: Mode;
-  onMainMenu: () => void;
+    difficulty: Mode;
+    onMainMenu: () => void;
 }
 
 function Agency({ difficulty, onMainMenu }: AgencyProps) {
-  const [mode] = useState<Mode>(difficulty);
-  const length = MODE_LENGTH[mode];
-  const [secret, setSecret] = useState(() => generateSecret(length));
+    const length = MODE_LENGTH[difficulty];
+    const [secret, setSecret] = useState(() => generateSecret(length));
 
   const [isPaused, setPaused] = useState(false);
   const [nbOpen, setNbOpen] = useState(false);
@@ -154,56 +154,39 @@ function Agency({ difficulty, onMainMenu }: AgencyProps) {
   };
 
   return (
-    <div style={{ position: "relative", width: "100%", height: "100vh" }}>
-      {/* HP UI */}
-      <HPBar />
-
-      {/* 게임 맵 */}
-      <div style={{ display: "flex", justifyContent: "center", alignItems: "center", height: "100%" }}>
-        <Map grid={grid} paused={isPaused || nbOpen} />
-      </div>
-
-      {/* 숫자야구 히스토리 - history가 있을 때만 표시 */}
-      {history.length > 0 && (
-        <div
-          id="nb-history"
-          style={{
-            position: "absolute",
-            top: "20px",
-            right: "20px",
-            background: "rgba(0, 0, 0, 0.7)",
-            color: "white",
-            padding: "12px 16px",
-            borderRadius: "8px",
-            fontFamily: "monospace",
-            fontSize: "14px",
-            lineHeight: "1.5",
-            maxHeight: "200px",
-            width: "240px",
-            overflowY: "auto",
-            boxShadow: "0 0 10px rgba(0,0,0,0.8)",
-            zIndex: 1000,
-            border: "2px solid #8b6f47",
-          }}
-        >
-          <h3 style={{ marginTop: 0, fontSize: "16px", borderBottom: "1px solid #888", color: "#f4e4c1" }}>
-            ⚾ Number Baseball
-          </h3>
-          {history.map((line, i) => <div key={i}>{line}</div>)}
+    <div id="Agency">
+        <div className="hp-bar">
+            <HPBar />
         </div>
-      )}
 
-      {/* 숫자야구 모달 */}
-      <NumberBaseball
-        open={nbOpen}
-        length={length}
-        secret={secret}
-        attemptIndex1={attemptCount + 1}
-        onClose={handleClose}
-        history={history}
-      />
+        <div className="game-display">
+            <Map grid={grid} paused={isPaused} />
+            {/* 모달 */}
+            <NumberBaseball
+                open={nbOpen}
+                length={length}
+                secret={secret}
+                attemptIndex1={attemptCount + 1}
+                onClose={handleClose}
+                difficulty={difficulty}
+                history={history}
+            />
+        </div>
+        <div
+            className="nb-history"
+        >
+            <h3>
+                ⚾ Number Baseball ⚾
+            </h3>
+            {/* 여기에 시도 기록들 출력 */}
+            {history.length === 0 ? (
+                <div style={{ opacity: 0.6 }}>No attempts yet.</div>
+            ) : (
+                history.map((line, i) => <div className="history"  key={i}>{line}</div>)
+            )}
+        </div>
 
-      {/* Pause UI */}
+        {/* Pause UI */}
       <PauseUI
         onResume={handleResume}
         onMainMenu={onMainMenu}
