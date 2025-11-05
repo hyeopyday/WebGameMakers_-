@@ -2,6 +2,9 @@ import { useEffect, useState } from "react";
 import NumberBaseball from "./NumberBaseball/NumberBaseball";
 import PauseUI from "./PauseUI/PauseUI";
 import SettingsUI from "./SettingsUI/SettingsUI";
+import HPBar from "./UI/HPBar";
+import GameOver from "./UI/GameOver";
+import GameVictory from "./UI/GameVictory";
 import { MODE_LENGTH, generateSecret } from "../type/numberBaseball";
 import { createGrid, carveMazeDFS, addSmallRooms, carveHighways, braidDeadEnds, openWallsForOpenness } from '../utils/gridGenerator';
 import { type Cell, MAP_WIDTH, MAP_HEIGHT } from "../type/type";
@@ -16,7 +19,7 @@ interface AgencyProps {
 function Agency({ difficulty, onMainMenu }: AgencyProps) {
   const [mode] = useState<Mode>(difficulty);
   const length = MODE_LENGTH[mode];
-  const [secret] = useState(() => generateSecret(length));
+  const [secret, setSecret] = useState(() => generateSecret(length));
 
   const [isPaused, setPaused] = useState(false);
   const [nbOpen, setNbOpen] = useState(false);
@@ -51,6 +54,24 @@ function Agency({ difficulty, onMainMenu }: AgencyProps) {
     return () => window.removeEventListener("enemyA-collide", onCollide as EventListener);
   }, []);
 
+  // 플레이어 사망 이벤트 리스너
+  useEffect(() => {
+    const onPlayerDead = () => {
+      setPaused(true);
+    };
+    window.addEventListener("player-dead", onPlayerDead);
+    return () => window.removeEventListener("player-dead", onPlayerDead);
+  }, []);
+
+  // 게임 승리 이벤트 리스너
+  useEffect(() => {
+    const onGameWin = () => {
+      setPaused(true);
+    };
+    window.addEventListener("game-win", onGameWin);
+    return () => window.removeEventListener("game-win", onGameWin);
+  }, []);
+
   // 숫자야구 게임 종료 핸들러
   const handleClose = (res: {
     guess: string;
@@ -60,18 +81,23 @@ function Agency({ difficulty, onMainMenu }: AgencyProps) {
   } | null) => {
     setNbOpen(false);
     setPaused(false);
+    
     if (!res) return;
     
     const idx = attemptCount + 1;
     setAttemptCount(idx);
     setHistory((prev) => [...prev, res.historyLine]);
     
+    // ✅ 숫자야구에서 승리했을 때 (4S = 완전 정답)
+    if (res.win) {
+      console.log("숫자야구 승리! 게임 클리어!");
+      // 게임 승리 이벤트 발송
+      window.dispatchEvent(new CustomEvent("game-win"));
+      return;
+    }
+    
     // ✅ 숫자야구 종료 후 몹 재배치 이벤트 발송
     window.dispatchEvent(new CustomEvent("reposition-mobs"));
-    
-    if (res.win) {
-      alert("숫자야구 승리! 🎉");
-    }
   };
 
   // 미로 생성
@@ -111,8 +137,27 @@ function Agency({ difficulty, onMainMenu }: AgencyProps) {
     setIsSettingsOpen(true);
   };
 
+  const handleRestart = () => {
+    // 게임 재시작 로직
+    setPaused(false);
+    setAttemptCount(0);
+    setHistory([]);
+  };
+
+  const handleVictoryContinue = () => {
+    // 승리 후 계속하기 - 새로운 숫자 생성
+    setPaused(false);
+    setAttemptCount(0);
+    setHistory([]);
+    setSecret(generateSecret(length));
+    console.log("새로운 게임 시작!");
+  };
+
   return (
     <div style={{ position: "relative", width: "100%", height: "100vh" }}>
+      {/* HP UI */}
+      <HPBar />
+
       {/* 게임 맵 */}
       <div style={{ display: "flex", justifyContent: "center", alignItems: "center", height: "100%" }}>
         <Map grid={grid} paused={isPaused || nbOpen} />
@@ -125,7 +170,7 @@ function Agency({ difficulty, onMainMenu }: AgencyProps) {
           style={{
             position: "absolute",
             top: "20px",
-            left: "20px",
+            right: "20px",
             background: "rgba(0, 0, 0, 0.7)",
             color: "white",
             padding: "12px 16px",
@@ -167,6 +212,12 @@ function Agency({ difficulty, onMainMenu }: AgencyProps) {
 
       {/* Settings UI */}
       <SettingsUI isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} />
+
+      {/* Game Over Screen */}
+      <GameOver onRestart={handleRestart} onMainMenu={onMainMenu} />
+
+      {/* Game Victory Screen */}
+      <GameVictory onContinue={handleVictoryContinue} onMainMenu={onMainMenu} />
     </div>
   );
 }

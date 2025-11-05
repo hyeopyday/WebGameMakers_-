@@ -115,6 +115,7 @@ const Character = ({ grid, paused }: CharacterProps) => {
       maxHP: 3,
       invincibleUntil: 0,
       blinkPhase: 0,
+      isDead: false,
     };
 
     // ✅ 최초 한 번만 스폰 위치 설정
@@ -135,7 +136,7 @@ const Character = ({ grid, paused }: CharacterProps) => {
     };
 
     const onKeyDown = (e: KeyboardEvent) => {
-      if (paused) { e.preventDefault(); return; }
+      if (paused || state.isDead) { e.preventDefault(); return; }
       if (e.code === "Space") {
         e.preventDefault();
         if (!state.spaceHeld) {
@@ -152,7 +153,7 @@ const Character = ({ grid, paused }: CharacterProps) => {
     };
     
     const onKeyUp = (e: KeyboardEvent) => {
-      if (paused) { e.preventDefault(); return; }
+      if (paused || state.isDead) { e.preventDefault(); return; }
       if (e.code === "Space") {
         state.spaceHeld = false;
         return;
@@ -169,18 +170,41 @@ const Character = ({ grid, paused }: CharacterProps) => {
 
     const onPlayerHit = (e: Event) => {
       const ce = e as CustomEvent<{ dmg?: number }>;
-      if (state.hp <= 0) return;
+      if (state.hp <= 0 || state.isDead) return;
       const now = performance.now();
       if (now < state.invincibleUntil) return;
+      
       const dmg = Math.max(1, Math.floor(ce.detail?.dmg ?? 1));
       state.hp = Math.max(0, state.hp - dmg);
-      state.invincibleUntil = now + 800;
+      state.invincibleUntil = now + 1000; // 1초 무적
+      
       console.log(`[HP] ${state.hp}/${state.maxHP}`);
+      
       if (state.hp === 0) {
+        state.isDead = true;
         window.dispatchEvent(new CustomEvent("player-dead"));
+        console.log("플레이어 사망!");
       }
     };
     window.addEventListener("player-hit", onPlayerHit as EventListener);
+
+    // HP 리셋 이벤트
+    const onResetHP = () => {
+      state.hp = state.maxHP;
+      state.isDead = false;
+      state.invincibleUntil = 0;
+      console.log("HP 리셋!");
+      
+      // 위치도 리셋
+      const spawn = findSpawnPoint(grid, { clearance: 0 });
+      state.px = spawn.x;
+      state.py = spawn.y;
+      if (globalState) {
+        globalState.px = state.px;
+        globalState.py = state.py;
+      }
+    };
+    window.addEventListener("reset-hp", onResetHP);
 
     const octantToDir: DirType[] = [
       DIR.LEFT,
@@ -213,7 +237,7 @@ const Character = ({ grid, paused }: CharacterProps) => {
       const destX = Math.floor(state.px - destW / 2);
       const destY = Math.floor(state.py - destH);
     
-      if (paused) {
+      if (paused || state.isDead) {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         ctx.imageSmoothingEnabled = false;
     
@@ -228,7 +252,17 @@ const Character = ({ grid, paused }: CharacterProps) => {
         if (!skipDraw) {
           const sx = (state.frame % FRAMES) * frameW;
           const sy = 0;
+          
+          // 사망 시 어둡게 표시
+          if (state.isDead) {
+            ctx.globalAlpha = 0.3;
+          }
+          
           ctx.drawImage(img, sx, sy, frameW, frameH, destX, destY, destW, destH);
+          
+          if (state.isDead) {
+            ctx.globalAlpha = 1;
+          }
         }
     
         raf = requestAnimationFrame(loop);
@@ -334,6 +368,7 @@ const Character = ({ grid, paused }: CharacterProps) => {
       document.removeEventListener("keydown", onKeyDown);
       document.removeEventListener("keyup", onKeyUp);
       window.removeEventListener("player-hit", onPlayerHit as EventListener);
+      window.removeEventListener("reset-hp", onResetHP);
     };
   }, [grid, paused]);
 
