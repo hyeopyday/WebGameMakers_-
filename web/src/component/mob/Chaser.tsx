@@ -13,7 +13,9 @@ import { moveWithWorldCollision } from "./Physic/Physic";
 import enemyPng from "../../assets/Chaser.png";
 
 interface ChaserProps {
-  grid: Cell[][]; paused?: boolean;}
+  grid: Cell[][]; 
+  paused?: boolean;
+}
 
 const CHASER_SPEED = 170;
 const PATH_RECALC_TIME = 0.3;
@@ -25,9 +27,14 @@ const SPRITE_SCALE = 2;
 const FRAMES = 4;
 const ANIM_FPS = 8;
 const CELL_SIZE = TILE_SIZE * SCALE;
-
-// ▼ 추가: 공격 쿨다운
 const ATTACK_COOLDOWN = 0.9;
+
+// ✅ 위치 유지를 위한 전역 상태
+let globalChaserState: {
+  px: number;
+  py: number;
+  initialized: boolean;
+} | null = null;
 
 function findPath(
   grid: Cell[][],
@@ -120,9 +127,7 @@ const Chaser = ({ grid, paused }: ChaserProps) => {
       accAnim: 0,
       mode: "idle" as "idle" | "attack",
       attackFreeze: 0,
-      // ▼ 추가: 공격 쿨다운
       attackCD: 0,
-
       path: [] as { x: number; y: number }[],
       pathTimer: 0,
       targetX: 0,
@@ -131,9 +136,16 @@ const Chaser = ({ grid, paused }: ChaserProps) => {
       lastTime: 0,
     };
 
-    const s = findSpawnPoint(grid, { clearance: 0 });
-    state.px = s.x;
-    state.py = s.y;
+    // ✅ 최초 한 번만 스폰
+    if (!globalChaserState || !globalChaserState.initialized) {
+      const s = findSpawnPoint(grid, { clearance: 0 });
+      state.px = s.x;
+      state.py = s.y;
+      globalChaserState = { px: s.x, py: s.y, initialized: true };
+    } else {
+      state.px = globalChaserState.px;
+      state.py = globalChaserState.py;
+    }
 
     const onPlayerPos = (e: Event) => {
       const ce = e as CustomEvent<{ x: number; y: number }>;
@@ -142,6 +154,29 @@ const Chaser = ({ grid, paused }: ChaserProps) => {
       state.havePlayer = true;
     };
     window.addEventListener("player-pos", onPlayerPos as EventListener);
+
+    // ✅ 몹 재배치 이벤트 리스너 - 무작위 위치
+    const onRepositionMobs = () => {
+      // 새로운 무작위 스폰 위치 찾기
+      const newSpawn = findSpawnPoint(grid, { clearance: 0 });
+      state.px = newSpawn.x;
+      state.py = newSpawn.y;
+      
+      // 전역 상태 업데이트
+      if (globalChaserState) {
+        globalChaserState.px = state.px;
+        globalChaserState.py = state.py;
+      }
+      
+      // 경로 초기화
+      state.path = [];
+      state.mode = "idle";
+      state.attackCD = 0;
+      state.attackFreeze = 0;
+      
+      console.log(`Chaser repositioned to random location: (${Math.floor(state.px)}, ${Math.floor(state.py)})`);
+    };
+    window.addEventListener("reposition-mobs", onRepositionMobs as EventListener);
 
     let raf = 0;
 
@@ -175,18 +210,16 @@ const Chaser = ({ grid, paused }: ChaserProps) => {
         );
     
         raf = requestAnimationFrame(loop);
-        return; // ✅ 아래 로직(경로/이동/공격/쿨다운 감소 등) 전부 스킵
+        return;
       }
-      state.pathTimer += dt;
 
-      // ▼ 쿨다운 감소
+      state.pathTimer += dt;
       if (state.attackCD > 0) state.attackCD = Math.max(0, state.attackCD - dt);
 
       const dx = state.targetX - state.px;
       const dy = state.targetY - state.py;
       const dist = Math.hypot(dx, dy);
 
-      // 상태 전환
       if (dist < ATTACK_RANGE && state.mode !== "attack") {
         state.mode = "attack";
         state.attackFreeze = ATTACK_FREEZE;
@@ -196,20 +229,17 @@ const Chaser = ({ grid, paused }: ChaserProps) => {
 
       if (state.attackFreeze > 0) state.attackFreeze -= dt;
 
-      // ▼ 공격 판정: 사정거리 + 쿨다운 여유
       if (dist < ATTACK_RANGE && state.attackCD <= 0) {
         window.dispatchEvent(new CustomEvent("player-hit", { detail: { dmg: 1 } }));
         state.attackCD = ATTACK_COOLDOWN;
       }
 
-      // 방향 계산
       if (Math.abs(dx) > Math.abs(dy)) {
         state.dir = dx > 0 ? 2 : 1;
       } else {
         state.dir = dy > 0 ? 0 : 3;
       }
 
-      // 경로 갱신
       if (state.havePlayer && state.pathTimer >= PATH_RECALC_TIME) {
         const sx = Math.floor(state.px / CELL_SIZE);
         const sy = Math.floor(state.py / CELL_SIZE);
@@ -220,7 +250,6 @@ const Chaser = ({ grid, paused }: ChaserProps) => {
         state.pathTimer = 0;
       }
 
-      // 이동 (공격 중엔 잠시 멈춤)
       if (state.attackFreeze <= 0 && state.path.length > 0) {
         const next = state.path[0];
         const tx = next.x * CELL_SIZE + CELL_SIZE / 2;
@@ -235,17 +264,21 @@ const Chaser = ({ grid, paused }: ChaserProps) => {
           const moved = moveWithWorldCollision(state.px, state.py, vx, vy, dt, grid);
           state.px = moved.x;
           state.py = moved.y;
+
+          // ✅ 전역 상태 업데이트
+          if (globalChaserState) {
+            globalChaserState.px = state.px;
+            globalChaserState.py = state.py;
+          }
         }
       }
 
-      // 애니메이션
       state.accAnim += dt;
       if (state.accAnim >= 1 / ANIM_FPS) {
         state.frame = (state.frame + 1) % FRAMES;
         state.accAnim = 0;
       }
 
-      // 렌더링
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       ctx.imageSmoothingEnabled = false;
 
@@ -277,6 +310,7 @@ const Chaser = ({ grid, paused }: ChaserProps) => {
     return () => {
       cancelAnimationFrame(raf);
       window.removeEventListener("player-pos", onPlayerPos as EventListener);
+      window.removeEventListener("reposition-mobs", onRepositionMobs as EventListener);
     };
   }, [grid, paused]);
 

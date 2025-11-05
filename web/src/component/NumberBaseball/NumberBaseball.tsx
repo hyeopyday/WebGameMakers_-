@@ -1,6 +1,6 @@
 // src/ui/NumberBaseball.tsx
 import React, { useEffect, useMemo, useState } from "react";
-import { judgeGuess, validateGuess, formatAttemptLine } from "../../type/numberBaseball";
+import { judgeGuess, validateGuess, formatAttemptLine, MODE_LENGTH, type Mode } from "../../type/numberBaseball";
 
 export type NBResult = {
   guess: string;
@@ -16,6 +16,7 @@ type Props = {
   attemptIndex1: number;   // 1부터 시작하는 시도 번호(표기용)
   onClose: (res: NBResult | null) => void; // null이면 취소/닫기
   history: string[];
+  difficulty: Mode;
 };
 
 const overlayStyle: React.CSSProperties = {
@@ -98,18 +99,38 @@ const footStyle: React.CSSProperties = {
   justifyContent: "flex-end",
 };
 
+const winMessageStyle: React.CSSProperties = {
+  background: "linear-gradient(135deg, #0a4a0a 0%, #0a2a0a 100%)",
+  border: "2px solid #00ff00",
+  borderRadius: 8,
+  padding: "16px",
+  margin: "12px 0",
+  textAlign: "center",
+  color: "#00ff00",
+  fontSize: "20px",
+  fontWeight: "bold",
+  textShadow: "0 0 10px rgba(0, 255, 0, 0.8)",
+  animation: "winPulse 1s ease-in-out infinite",
+};
+
 export default function NumberBaseball({
   open,
   length,
   secret,
   attemptIndex1,
   onClose,
+  difficulty
 }: Props) {
   const [picked, setPicked] = useState<string[]>([]);
+  const [showWinMessage, setShowWinMessage] = useState(false);
   const canSubmit = picked.length === length;
 
+
   useEffect(() => {
-    if (!open) setPicked([]);
+    if (!open) {
+      setPicked([]);
+      setShowWinMessage(false);
+    }
   }, [open, length]);
 
   const usedSet = useMemo(() => new Set(picked), [picked]);
@@ -126,6 +147,10 @@ export default function NumberBaseball({
 
   const clearAll = () => setPicked([]);
 
+  const removeLast = () => {
+    setPicked((prev) => prev.slice(0, -1));
+  };
+
   const submit = () => {
     const guess = picked.join("");
     const err = validateGuess(guess, length);
@@ -136,10 +161,67 @@ export default function NumberBaseball({
     const result = judgeGuess(guess, secret);
     const historyLine = formatAttemptLine(attemptIndex1, guess, result);
 
-
     const win = result.strike === length;
-    onClose({ guess, result, historyLine, win });
+    
+    if (win) {
+      setShowWinMessage(true);
+      // 1.5초 후 자동으로 닫기
+      setTimeout(() => {
+        onClose({ guess, result, historyLine, win });
+      }, 1500);
+    } else {
+      onClose({ guess, result, historyLine, win });
+    }
   };
+
+  const onKeyDown = (e: KeyboardEvent) => {
+    if (!open) return;
+
+    // 숫자키 판정 (상단 숫자열 + 넘패드)
+    const isDigit =
+      (/^[0-9]$/.test(e.key)) ||
+      (e.code?.startsWith("Numpad") && /^[0-9]$/.test(e.code.replace("Numpad", "")));
+
+    if (isDigit) {
+      e.preventDefault();
+      const d = /^[0-9]$/.test(e.key)
+        ? e.key
+        : e.code.replace("Numpad", "");
+      addDigit(d);
+      return;
+    }
+
+    // 삭제(마지막 칸)
+    if (e.key === "Backspace" || e.key === "Delete") {
+      e.preventDefault();
+      removeLast();
+      return;
+    }
+
+    // 제출
+    if (e.key === "Enter") {
+      e.preventDefault();
+      if (canSubmit) submit();
+      return;
+    }
+
+    // 전체지우기
+    if (e.key === "Escape") {
+      e.preventDefault();
+      clearAll();
+      return;
+    }
+  };
+
+  // ⇩ 다른 useEffect들과 나란히 추가
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: KeyboardEvent) => onKeyDown(e);
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+    // picked/length/canSubmit/submit 등이 클로저로 쓰이므로 deps에 포함
+  }, [open, picked, length, canSubmit, secret, attemptIndex1]);
+
 
   if (!open) return null;
 
@@ -155,6 +237,13 @@ export default function NumberBaseball({
             ✕
           </button>
         </div>
+
+        {/* 승리 메시지 */}
+        {showWinMessage && (
+          <div style={winMessageStyle}>
+            🎉 정답입니다! ESCAPE! 🎉
+          </div>
+        )}
 
         {/* 선택 슬롯 */}
         <div style={slotsStyle}>
@@ -206,6 +295,17 @@ export default function NumberBaseball({
           </button>
         </div>
       </div>
+
+      <style>{`
+        @keyframes winPulse {
+          0%, 100% {
+            box-shadow: 0 0 20px rgba(0, 255, 0, 0.6);
+          }
+          50% {
+            box-shadow: 0 0 40px rgba(0, 255, 0, 1);
+          }
+        }
+      `}</style>
     </div>
   );
 }
