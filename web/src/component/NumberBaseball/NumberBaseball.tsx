@@ -1,6 +1,6 @@
 // src/ui/NumberBaseball.tsx
 import React, { useEffect, useMemo, useState } from "react";
-import { judgeGuess, validateGuess, formatAttemptLine } from "../../type/numberBaseball";
+import { judgeGuess, validateGuess, formatAttemptLine, MODE_LENGTH, type Mode } from "../../type/numberBaseball";
 
 export type NBResult = {
   guess: string;
@@ -16,6 +16,7 @@ type Props = {
   attemptIndex1: number;   // 1부터 시작하는 시도 번호(표기용)
   onClose: (res: NBResult | null) => void; // null이면 취소/닫기
   history: string[];
+  difficulty: Mode;
 };
 
 const overlayStyle: React.CSSProperties = {
@@ -104,9 +105,11 @@ export default function NumberBaseball({
   secret,
   attemptIndex1,
   onClose,
+  difficulty
 }: Props) {
   const [picked, setPicked] = useState<string[]>([]);
   const canSubmit = picked.length === length;
+
 
   useEffect(() => {
     if (!open) setPicked([]);
@@ -126,6 +129,10 @@ export default function NumberBaseball({
 
   const clearAll = () => setPicked([]);
 
+  const removeLast = () => {
+    setPicked((prev) => prev.slice(0, -1));
+  };
+
   const submit = () => {
     const guess = picked.join("");
     const err = validateGuess(guess, length);
@@ -140,6 +147,55 @@ export default function NumberBaseball({
     const win = result.strike === length;
     onClose({ guess, result, historyLine, win });
   };
+
+  const onKeyDown = (e: KeyboardEvent) => {
+    if (!open) return;
+
+    // 숫자키 판정 (상단 숫자열 + 넘패드)
+    const isDigit =
+      (/^[0-9]$/.test(e.key)) ||
+      (e.code?.startsWith("Numpad") && /^[0-9]$/.test(e.code.replace("Numpad", "")));
+
+    if (isDigit) {
+      e.preventDefault();
+      const d = /^[0-9]$/.test(e.key)
+        ? e.key
+        : e.code.replace("Numpad", "");
+      addDigit(d);
+      return;
+    }
+
+    // 삭제(마지막 칸)
+    if (e.key === "Backspace" || e.key === "Delete") {
+      e.preventDefault();
+      removeLast();
+      return;
+    }
+
+    // 제출
+    if (e.key === "Enter") {
+      e.preventDefault();
+      if (canSubmit) submit();
+      return;
+    }
+
+    // 전체지우기
+    if (e.key === "Escape") {
+      e.preventDefault();
+      clearAll();
+      return;
+    }
+  };
+
+  // ⇩ 다른 useEffect들과 나란히 추가
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: KeyboardEvent) => onKeyDown(e);
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+    // picked/length/canSubmit/submit 등이 클로저로 쓰이므로 deps에 포함
+  }, [open, picked, length, canSubmit, secret, attemptIndex1]);
+
 
   if (!open) return null;
 

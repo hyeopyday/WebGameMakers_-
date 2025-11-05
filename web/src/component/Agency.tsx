@@ -6,14 +6,15 @@ import { createGrid, carveMazeDFS, addSmallRooms, carveHighways, braidDeadEnds, 
 import { type Cell, MAP_WIDTH, MAP_HEIGHT } from "../type/type";
 import Map from "./Map/Map";
 import { type Mode } from "../type/numberBaseball";
+import "./Agency.css";
 // ... Map import 등
 interface AgencyProps {
-    difficulty : Mode
+    difficulty: Mode
 }
 
 function Agency({ difficulty }: AgencyProps) {
     const [mode, setMode] = useState<1 | 2 | 3>(1);
-    const length = MODE_LENGTH[mode];
+    const length = MODE_LENGTH[difficulty];
     const [secret, setSecret] = useState(() => generateSecret(length));
 
     const [isPaused, setPaused] = useState(false);
@@ -91,37 +92,23 @@ function Agency({ difficulty }: AgencyProps) {
     }, [difficulty]);
 
     return (
-        <>
+        <div id="Agency">
             {/* 네 UI … */}
-            <Map grid={grid} paused={isPaused} />
-            {/* 모달 */}
-            <NumberBaseball
-                open={nbOpen}
-                length={length}
-                secret={secret}
-                attemptIndex1={attemptCount + 1}
-                onClose={handleClose}
-                history={history}
-            />
+            <div className="game-display">
+                <Map grid={grid} paused={isPaused} />
+                {/* 모달 */}
+                <NumberBaseball
+                    open={nbOpen}
+                    length={length}
+                    secret={secret}
+                    attemptIndex1={attemptCount + 1}
+                    onClose={handleClose}
+                    difficulty={difficulty}
+                    history={history}
+                />
+            </div>
             <div
-                id="nb-history"
-                style={{
-                    position: "absolute",
-                    top: "20px",
-                    left: "20px",
-                    background: "rgba(0, 0, 0, 0.6)",
-                    color: "white",
-                    padding: "12px 16px",
-                    borderRadius: "8px",
-                    fontFamily: "monospace",
-                    fontSize: "14px",
-                    lineHeight: "1.5",
-                    maxHeight: "200px",
-                    width: "240px",
-                    overflowY: "auto",
-                    boxShadow: "0 0 6px rgba(0,0,0,0.5)",
-                    zIndex: 1000,
-                }}
+                className="nb-history"
             >
                 <h3 style={{ marginTop: 0, fontSize: "16px", borderBottom: "1px solid #888" }}>
                     ⚾ Number Baseball
@@ -134,7 +121,7 @@ function Agency({ difficulty }: AgencyProps) {
                 )}
             </div>
 
-        </>
+        </div>
     );
 }
 
