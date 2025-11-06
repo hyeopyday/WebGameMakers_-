@@ -99,11 +99,6 @@ function Agency({ difficulty, onMainMenu }: AgencyProps) {
         window.dispatchEvent(new CustomEvent("item-teleport"));
         break;
       }
-      case "BALL": {
-        // 체이서 잠깐 멈춤(혹은 느리게) 3.5초
-        window.dispatchEvent(new CustomEvent("item-bondage", { detail: { slow: 0.2, duration: 3500 } }));
-        break;
-      }
       case "VISIBILITY": {
         // 시야 8초 밝게
         window.dispatchEvent(new CustomEvent("item-visibility", { detail: { radius: 360, duration: 8000 } }));
@@ -112,11 +107,6 @@ function Agency({ difficulty, onMainMenu }: AgencyProps) {
       case "BONDAGE": {
         // 적 속박 5초 (더 강력)
         window.dispatchEvent(new CustomEvent("item-bondage", { detail: { slow: 0.05, duration: 5000 } }));
-        break;
-      }
-      case "STRIKE": {
-        // 체이서 강제 경직 + 리스폰 느낌: 재배치
-        window.dispatchEvent(new CustomEvent("reposition-mobs"));
         break;
       }
       case "KEY": {
