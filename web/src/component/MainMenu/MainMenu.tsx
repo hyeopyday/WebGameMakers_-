@@ -14,6 +14,8 @@ import checkboxGreenImg from "../../assets/checkbox_green.png";
 import langButtonImg from "../../assets/lang_button.png";
 import "./MainMenu.css";
 import { type Mode } from "../../type/numberBaseball";
+import { setDifficulty } from "../../type/difficulty";
+
 
 interface MainMenuProps {
 onStartGame: (mode: Mode) => void;}
@@ -162,9 +164,11 @@ const MainMenu = ({ onStartGame }: MainMenuProps) => {
     return names[lang];
   };
 
-  const handleDifficultySelect = (mode: Mode) => {
-    onStartGame(mode);
-  };
+const handleDifficultySelect = (mode: Mode) => {
+  setDifficulty(mode);
+  onStartGame(mode);
+};
+
 
   const canvasWidth = MAP_WIDTH * TILE_SIZE * SCALE;
   const canvasHeight = MAP_HEIGHT * TILE_SIZE * SCALE;

@@ -5,99 +5,113 @@ import type { Mode } from "./numberBaseball";
 
 export interface DifficultySpec {
   name: "Normal" | "Hard" | "Hell";
-  playerMaxHP: number; // 플레이어 체력
-  chaserSpeed: number; // 체이서 이동속도 (타일/초)
-  runnerSpeed: number; // 러너 이동속도 (타일/초)
-  chaserCount: number; // 체이서 개체수
+  playerMaxHP: number;      // 플레이어 체력
+  chaserSpeed: number;      // 체이서 이동속도 (타일/초)
+  runnerSpeed: number;      // 러너 이동속도 (타일/초)
+  chaserCount: number;      // 체이서 개체수
 }
 
+/** 난이도 변경 브로드캐스트 이벤트 이름 (모듈 전역 상수로 고정) */
+export const DIFFICULTY_CHANGED = "difficulty-changed";
+
+/** 로컬스토리지 키 */
+const STORAGE_KEY = "game:difficulty-mode";
+
+/** 난이도 테이블: 1=보통, 2=어려움, 3=헬 */
 const TABLE: Record<Mode, DifficultySpec> = {
   1: {
     name: "Normal",
     playerMaxHP: 3,
-    chaserSpeed: 1.0,
-    runnerSpeed: 1.0,
-    chaserCount: 2,
+    chaserSpeed: 3.2,
+    runnerSpeed: 3.5,
+    chaserCount: 1,
   },
   2: {
     name: "Hard",
-    playerMaxHP: 2,
-    chaserSpeed: 1.95,
-    runnerSpeed: 1.9,
-    chaserCount: 3,
+    playerMaxHP: 3,
+    chaserSpeed: 5.7,
+    runnerSpeed: 3.3,
+    chaserCount: 1,
   },
   3: {
     name: "Hell",
-    playerMaxHP: 1,
-    chaserSpeed: 3.0,
-    runnerSpeed: 2.1,
-    chaserCount: 4,
+    playerMaxHP: 2,
+    chaserSpeed: 7.2,
+    runnerSpeed: 8.6,
+    chaserCount: 2,
   },
 };
 
-const STORAGE_KEY = "game.difficulty.mode";
-export const DIFFICULTY_CHANGED = "difficulty-changed";
+/** 내부 상태 */
+type DiffState = {
+  mode: Mode;
+  spec: DifficultySpec;
+};
 
-function readInitialMode(): Mode {
+const loadInitialMode = (): Mode => {
   try {
-    const raw = typeof localStorage !== "undefined" ? localStorage.getItem(STORAGE_KEY) : null;
-    const m = raw ? Number(raw) : 1;
-    if (m === 1 || m === 2 || m === 3) return m as Mode;
+    const raw = typeof window !== "undefined" ? window.localStorage.getItem(STORAGE_KEY) : null;
+    const n = raw ? Number(raw) : NaN;
+    if (n === 1 || n === 2 || n === 3) return n as Mode;
   } catch {}
-  return 1;
-}
+  return 1 as Mode; // 기본값: 보통
+};
 
+const initialMode = loadInitialMode();
 
-
-
-// test
-// ✅ 초기화를 한 번만 수행
-const initialMode = readInitialMode();
-
-const state = {
+const state: DiffState = {
   mode: initialMode,
   spec: TABLE[initialMode],
 };
 
-export function setDifficulty(mode: Mode): void {
-  const next = mode === 1 || mode === 2 || mode === 3 ? mode : 1;
-  state.mode = next;
-  state.spec = TABLE[next];
+/** 현재 난이도 조회용 헬퍼 */
+export type DiffSnapshot = Readonly<DiffState>;
+export function getDifficulty(): DiffSnapshot {
+  return { mode: state.mode, spec: state.spec };
+}
 
-  console.log(`🎮 [Difficulty] setDifficulty(${next}) 호출됨 - ${state.spec.name}`);
+/**
+ * 난이도 변경
+ * - 1=보통, 2=어려움, 3=헬만 허용
+ * - 변경 시 DIFFICULTY_CHANGED 이벤트 발행
+ * - 체력 초기화 및 적 재배치 이벤트도 함께 발행
+ */
+export function setDifficulty(next: Mode): void {
+  // 유효 범위 보정
+  const normalized = (next === 1 || next === 2 || next === 3) ? next : (1 as Mode);
 
+  // 상태 갱신
+  state.mode = normalized;
+  state.spec = TABLE[normalized];
+
+  // 영속화
   try {
-    if (typeof localStorage !== "undefined") {
-      localStorage.setItem(STORAGE_KEY, String(next));
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem(STORAGE_KEY, String(normalized));
     }
   } catch {}
 
+  // 브로드캐스트
   if (typeof window !== "undefined") {
-    window.dispatchEvent(new CustomEvent(DIFFICULTY_CHANGED, { detail: { mode: next, spec: state.spec } }));
-    console.log(`🎮 [Difficulty] DIFFICULTY_CHANGED 이벤트 발생`);
-
-    // ✅ 체력 리셋 + 적 재배치 이벤트 추가
+    window.dispatchEvent(new CustomEvent(DIFFICULTY_CHANGED, { detail: { mode: state.mode } }));
+    // 플레이어 HP/스폰 보정
     window.dispatchEvent(new Event("reset-hp"));
+    // 적 재배치 보정
     window.dispatchEvent(new Event("reposition-mobs"));
   }
 }
 
-export function getDifficulty(): DifficultySpec {
-  return state.spec;
-}
-
-export function getMode(): Mode {
-  return state.mode;
-}
-
-// ✅ Proxy를 통해 항상 최신 spec 반환
+/**
+ * DIFFICULTY: 항상 최신 사양을 노출하는 읽기용 프록시
+ * - 소비측(캐릭터/적 AI)은 기존처럼 DIFFICULTY.playerMaxHP 등으로 접근
+ */
 export const DIFFICULTY = new Proxy({} as DifficultySpec, {
   get(_: DifficultySpec, p: keyof DifficultySpec) {
-    const value = state.spec[p];
-    return value;
+    return state.spec[p];
   },
 }) as DifficultySpec;
 
+/** 라벨→모드 매핑이 필요할 때 사용 */
 export const ModeMap = {
   normal: 1 as Mode,
   hard: 2 as Mode,
