@@ -206,15 +206,15 @@ const Runner = ({ grid, paused }: RunnerProps) => {
 
     };
 
-    if (!globalRunnerState || !globalRunnerState.initialized) {
-      const s = findSpawnPoint(grid, { clearance: 0 });
-      state.px = s.x;
-      state.py = s.y;
-      globalRunnerState = { px: s.x, py: s.y, initialized: true };
-    } else {
-      state.px = globalRunnerState.px;
-      state.py = globalRunnerState.py;
-    }
+    // 항상 새로운 안전한 위치에서 스폰
+    const s = findSpawnPoint(grid, { clearance: 0 });
+    state.px = s.x;
+    state.py = s.y;
+    globalRunnerState = { px: s.x, py: s.y, initialized: true };
+    
+    const spawnCellX = Math.floor(s.x / CELL_SIZE);
+    const spawnCellY = Math.floor(s.y / CELL_SIZE);
+    console.log(`[Runner] 스폰 위치: 픽셀(${s.x}, ${s.y}), 셀(${spawnCellX}, ${spawnCellY}), 타일타입: ${grid[spawnCellY]?.[spawnCellX]}`);
 
     const onPlayerPos = (e: Event) => {
       const ce = e as CustomEvent<{ x: number; y: number }>;
@@ -233,34 +233,10 @@ const Runner = ({ grid, paused }: RunnerProps) => {
     window.addEventListener("player-pos", onPlayerPos as EventListener);
 
     const onRepositionMobs = () => {
-      const WORLD_W = MAP_WIDTH * TILE_SIZE * SCALE;
-      const WORLD_H = MAP_HEIGHT * TILE_SIZE * SCALE;
-
-      const targetCellX = state.targetX < WORLD_W / 2 ? Math.floor(MAP_WIDTH * 0.8) : Math.floor(MAP_WIDTH * 0.2);
-      const targetCellY = state.targetY < WORLD_H / 2 ? Math.floor(MAP_HEIGHT * 0.8) : Math.floor(MAP_HEIGHT * 0.2);
-
-      let foundX = targetCellX;
-      let foundY = targetCellY;
-      let found = false;
-
-      for (let radius = 0; radius < 10 && !found; radius++) {
-        for (let dy = -radius; dy <= radius && !found; dy++) {
-          for (let dx = -radius; dx <= radius && !found; dx++) {
-            const checkX = targetCellX + dx;
-            const checkY = targetCellY + dy;
-            if (checkX >= 0 && checkX < MAP_WIDTH && checkY >= 0 && checkY < MAP_HEIGHT) {
-              if (grid[checkY][checkX] !== WALL) {
-                foundX = checkX;
-                foundY = checkY;
-                found = true;
-              }
-            }
-          }
-        }
-      }
-
-      state.px = (foundX + 0.5) * CELL_SIZE;
-      state.py = (foundY + 1) * CELL_SIZE;
+      // findSpawnPoint 사용해서 안전한 위치 찾기
+      const s = findSpawnPoint(grid, { clearance: 0 });
+      state.px = s.x;
+      state.py = s.y;
 
       if (globalRunnerState) {
         globalRunnerState.px = state.px;
@@ -270,7 +246,7 @@ const Runner = ({ grid, paused }: RunnerProps) => {
       state.path = [];
       state.mode = "idle";
 
-      console.log(`Runner repositioned to opposite corner: (${foundX}, ${foundY})`);
+      console.log(`Runner repositioned to safe spawn: (${s.x}, ${s.y})`);
     };
     window.addEventListener("reposition-mobs", onRepositionMobs as EventListener);
 

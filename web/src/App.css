@@ -5,3 +5,21 @@
   text-align: center;
 }
 
+#AA .container {
+  margin: 0 auto;
+}
+
+#AA .button {
+  padding: 12px 28px;
+  margin: 0 10px;
+  font-size: 18px;
+  font-weight: 600;
+  border-radius: 12px;
+  border: none;
+  cursor: pointer;
+  background: linear-gradient(90deg, #22d3ee, #38bdf8);
+  color: #06121a;
+  box-shadow: 0 6px 20px rgba(0,0,0,0.3);
+  transition: transform 0.1s ease-in-out;
+  display: inline-block;
+}
