@@ -1,5 +1,5 @@
-// src/component/UI/HPBar.tsx
 import { useEffect, useState } from "react";
+import { audioManager } from "../../utils/audioManager";
 import fullHP from "../../assets/FullHP.png";
 import oneAttackHP from "../../assets/1AttackHP.png";
 import twoAttackHP from "../../assets/2AttackHP.png";
@@ -12,8 +12,11 @@ const HPBar = () => {
 
   useEffect(() => {
     const handlePlayerHit = () => {
+      audioManager.playSFX("/sounds/damage.mp3");
+      
       setCurrentHP((prev) => {
         const newHP = Math.max(0, prev - 1);
+        
         if (newHP === 0) {
           setTimeout(() => {
             window.dispatchEvent(new CustomEvent("player-dead"));

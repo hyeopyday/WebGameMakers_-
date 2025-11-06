@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { audioManager } from "../../utils/audioManager";
 import "./PauseUI.css";
 
 interface PauseUIProps {
@@ -33,22 +34,34 @@ const PauseUI = ({ onResume, onMainMenu, onSettings }: PauseUIProps) => {
   if (!isVisible) return null;
 
   const handleResume = () => {
+    audioManager.playSFX("/sounds/click.mp3");
     setIsVisible(false);
     onResume();
   };
 
   const handleMainMenu = () => {
     if (window.confirm("메인 메뉴로 돌아가시겠습니까? (진행 상황이 저장되지 않습니다)")) {
+      audioManager.playSFX("/sounds/click.mp3");
       setIsVisible(false);
+      
+      audioManager.stopBGM(true);
+      setTimeout(() => {
+        audioManager.playBGM("/sounds/main.mp3", true);
+      }, 500);
+      
       onMainMenu();
     }
+  };
+
+  const handleSettings = () => {
+    audioManager.playSFX("/sounds/click.mp3");
+    onSettings();
   };
 
   return (
     <div className="pause-overlay">
       <div className="pause-container">
         <div className="pause-background">
-          {/* 배경 이미지 */}
           <div className="pause-bg-placeholder">
             <div className="pause-text">
               <h2>일시정지</h2>
@@ -69,7 +82,7 @@ const PauseUI = ({ onResume, onMainMenu, onSettings }: PauseUIProps) => {
 
             <button
               className="pause-button settings-btn"
-              onClick={onSettings}
+              onClick={handleSettings}
               title="설정"
               aria-label="설정 열기"
             >

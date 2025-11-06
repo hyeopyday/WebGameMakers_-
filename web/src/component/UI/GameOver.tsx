@@ -1,5 +1,5 @@
-// GameOver.tsx
 import { useEffect, useState } from "react";
+import { audioManager } from "../../utils/audioManager";
 import "./GameOver.css";
 import gameoverImg from "../../assets/gameover/gameover.png";
 import restartBtn from "../../assets/gameover/다시하기.png";
@@ -16,6 +16,8 @@ const GameOver = ({ onRestart, onMainMenu }: GameOverProps) => {
   useEffect(() => {
     const handlePlayerDead = () => {
       setIsVisible(true);
+      audioManager.stopBGM(true);
+      audioManager.playSFX("/sounds/game_over.mp3");
     };
 
     window.addEventListener("player-dead", handlePlayerDead);
@@ -28,14 +30,26 @@ const GameOver = ({ onRestart, onMainMenu }: GameOverProps) => {
   if (!isVisible) return null;
 
   const handleRestart = () => {
+    audioManager.playSFX("/sounds/click.mp3");
     setIsVisible(false);
     window.dispatchEvent(new CustomEvent("reset-hp"));
     window.dispatchEvent(new CustomEvent("reposition-mobs"));
+    
+    setTimeout(() => {
+      audioManager.playBGM("/sounds/playing_game.mp3", true);
+    }, 300);
+    
     onRestart();
   };
 
   const handleMainMenu = () => {
+    audioManager.playSFX("/sounds/click.mp3");
     setIsVisible(false);
+    
+    setTimeout(() => {
+      audioManager.playBGM("/sounds/main.mp3", true);
+    }, 300);
+    
     onMainMenu();
   };
 
