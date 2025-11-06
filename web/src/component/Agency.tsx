@@ -1,7 +1,8 @@
+// src/component/Agency.tsx
 import { useEffect, useState } from "react";
-import { audioManager } from "../utils/audioManager";
 import NumberBaseball from "./NumberBaseball/NumberBaseball";
 import PauseUI from "./PauseUI/PauseUI";
+import { audioManager } from "../utils/audioManager";
 import SettingsUI from "./SettingsUI/SettingsUI";
 import HPBar from "./UI/HPBar";
 import ItemSlots from "./UI/ItemSlots";
@@ -37,17 +38,6 @@ function Agency({ difficulty, onMainMenu }: AgencyProps) {
   const [items, setItems] = useState<Item[]>([]);
 
   useEffect(() => {
-    audioManager.stopBGM(true);
-    setTimeout(() => {
-      audioManager.playBGM("/sounds/playing_game.mp3", true);
-    }, 500);
-
-    return () => {
-      audioManager.stopBGM(false);
-    };
-  }, []);
-
-  useEffect(() => {
     try {
       if (typeof localStorage !== "undefined") {
         localStorage.setItem("game.difficulty.mode", String(difficulty));
@@ -59,10 +49,17 @@ function Agency({ difficulty, onMainMenu }: AgencyProps) {
   }, [difficulty]);
 
   function decideGrade(strike: number, ball: number, out: number): ItemGrade | null {
+    // 조건 표 그대로 구현
+    if ((strike === 1 && ball === 2 && out === 1) ||
+      (strike === 2 && ball === 1 && out === 1)) {
+      return "S";
+    }
+    if (strike === 0 && ball === 3 && out === 1) return "B";
+    if (strike === 0 && ball === 0 && out === 4) return null;
+
     // (확장 규칙) S > B > O 우선순위 — 예외 케이스에 대비
     if (strike > 0) return "S";
     if (ball > 0) return "B";
-    if (out > 0) return null;
     return null;
   }
 
@@ -148,11 +145,29 @@ function Agency({ difficulty, onMainMenu }: AgencyProps) {
     window.addEventListener("enemyA-collide", onCollide as EventListener);
     return () => window.removeEventListener("enemyA-collide", onCollide as EventListener);
   }, []);
+  useEffect(() => {
+    const onCollide = () => {
+      setPaused(true);
+      setNbOpen(true);
+    };
+    window.addEventListener("enemyA-collide", onCollide as EventListener);
+    return () => window.removeEventListener("enemyA-collide", onCollide as EventListener);
+  }, []);
+
+  useEffect(() => {
+    audioManager.stopBGM(true);
+    setTimeout(() => {
+      audioManager.playBGM("/sounds/playing_game.mp3", true);
+    }, 500);
+
+    return () => {
+      audioManager.stopBGM(false);
+    };
+  }, []);
 
   useEffect(() => {
     const onGameWin = () => {
       setPaused(true);
-      audioManager.stopBGM(true);
     };
     window.addEventListener("game-win", onGameWin);
     return () => window.removeEventListener("game-win", onGameWin);
@@ -243,8 +258,8 @@ function Agency({ difficulty, onMainMenu }: AgencyProps) {
     setSecret(generateSecret(length));    // 비밀 갱신
     window.dispatchEvent(new CustomEvent("reset-hp"));
     audioManager.playBGM("/sounds/playing_game.mp3", true);
-  };
 
+  };
   const handleMainMenuFromAgency = () => {
     audioManager.stopBGM(true);
     setTimeout(() => {

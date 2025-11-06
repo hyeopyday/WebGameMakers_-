@@ -1,3 +1,4 @@
+
 // FILE: src/component/mob/Runner.tsx
 import { useEffect, useRef, useState } from "react";
 import type { Cell } from "../../type/type";
@@ -146,9 +147,6 @@ function pickEscapePath(
 const Runner = ({ grid, paused }: RunnerProps) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [difficultyVersion, setDifficultyVersion] = useState(0);
-  const slowMultRef = useRef(1);
-  const slowUntilRef = useRef(0);
-  const rootUntilRef = useRef(0);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -167,6 +165,7 @@ const Runner = ({ grid, paused }: RunnerProps) => {
     // @ts-ignore
     canvas.style.imageRendering = "pixelated";
     canvas.style.backgroundColor = "transparent";
+    canvas.style.zIndex = "5";
 
     // 좌/우 시트 로드
     const imgLeft = new Image();
@@ -202,18 +201,17 @@ const Runner = ({ grid, paused }: RunnerProps) => {
       preferLeft: true,
       collideCd: 0,
       lastVx: 1, // ≥0 오른쪽, <0 왼쪽
-
     };
 
-    // 항상 새로운 안전한 위치에서 스폰
-    const s = findSpawnPoint(grid, { clearance: 0 });
-    state.px = s.x;
-    state.py = s.y;
-    globalRunnerState = { px: s.x, py: s.y, initialized: true };
-    
-    const spawnCellX = Math.floor(s.x / CELL_SIZE);
-    const spawnCellY = Math.floor(s.y / CELL_SIZE);
-    console.log(`[Runner] 스폰 위치: 픽셀(${s.x}, ${s.y}), 셀(${spawnCellX}, ${spawnCellY}), 타일타입: ${grid[spawnCellY]?.[spawnCellX]}`);
+    if (!globalRunnerState || !globalRunnerState.initialized) {
+      const s = findSpawnPoint(grid, { clearance: 0 });
+      state.px = s.x;
+      state.py = s.y;
+      globalRunnerState = { px: s.x, py: s.y, initialized: true };
+    } else {
+      state.px = globalRunnerState.px;
+      state.py = globalRunnerState.py;
+    }
 
     const onPlayerPos = (e: Event) => {
       const ce = e as CustomEvent<{ x: number; y: number }>;
@@ -221,21 +219,37 @@ const Runner = ({ grid, paused }: RunnerProps) => {
       state.targetY = ce.detail.y;
       state.havePlayer = true;
     };
-    const onSlow = () => {
-      slowMultRef.current = 0.5;                // 러너는 50% 감속
-      slowUntilRef.current = performance.now() + 3000; // 3초
-    };
-    const onRoot = () => { rootUntilRef.current = performance.now() + 1500; };
-
-    window.addEventListener("item-slow", onSlow);
-    window.addEventListener("item-root", onRoot);
     window.addEventListener("player-pos", onPlayerPos as EventListener);
 
     const onRepositionMobs = () => {
-      // findSpawnPoint 사용해서 안전한 위치 찾기
-      const s = findSpawnPoint(grid, { clearance: 0 });
-      state.px = s.x;
-      state.py = s.y;
+      const WORLD_W = MAP_WIDTH * TILE_SIZE * SCALE;
+      const WORLD_H = MAP_HEIGHT * TILE_SIZE * SCALE;
+
+      const targetCellX = state.targetX < WORLD_W / 2 ? Math.floor(MAP_WIDTH * 0.8) : Math.floor(MAP_WIDTH * 0.2);
+      const targetCellY = state.targetY < WORLD_H / 2 ? Math.floor(MAP_HEIGHT * 0.8) : Math.floor(MAP_HEIGHT * 0.2);
+
+      let foundX = targetCellX;
+      let foundY = targetCellY;
+      let found = false;
+
+      for (let radius = 0; radius < 10 && !found; radius++) {
+        for (let dy = -radius; dy <= radius && !found; dy++) {
+          for (let dx = -radius; dx <= radius && !found; dx++) {
+            const checkX = targetCellX + dx;
+            const checkY = targetCellY + dy;
+            if (checkX >= 0 && checkX < MAP_WIDTH && checkY >= 0 && checkY < MAP_HEIGHT) {
+              if (grid[checkY][checkX] !== WALL) {
+                foundX = checkX;
+                foundY = checkY;
+                found = true;
+              }
+            }
+          }
+        }
+      }
+
+      state.px = (foundX + 0.5) * CELL_SIZE;
+      state.py = (foundY + 1) * CELL_SIZE;
 
       if (globalRunnerState) {
         globalRunnerState.px = state.px;
@@ -245,7 +259,7 @@ const Runner = ({ grid, paused }: RunnerProps) => {
       state.path = [];
       state.mode = "idle";
 
-      console.log(`Runner repositioned to safe spawn: (${s.x}, ${s.y})`);
+      console.log(`Runner repositioned to opposite corner: (${foundX}, ${foundY})`);
     };
     window.addEventListener("reposition-mobs", onRepositionMobs as EventListener);
 
@@ -276,23 +290,23 @@ const Runner = ({ grid, paused }: RunnerProps) => {
       }
       state.pathTimer = 0;
     }
+
     const loop = (t: number) => {
       if (!state.lastTime) state.lastTime = t;
       const dt = Math.min(0.033, (t - state.lastTime) / 1000);
       state.lastTime = t;
-    
-      // ── 일시정지: 현재 방향의 첫 프레임만 그려주고 리턴
+
       if (paused) {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         ctx.imageSmoothingEnabled = false;
-    
+
+        // 일시정지 시 현재 방향 기준 첫 프레임 표시
         const useRight = state.lastVx >= 0;
         const img = useRight ? imgRight : imgLeft;
         const fw = useRight ? frameWRight : frameWLeft;
         const fh = useRight ? frameHRight : frameHLeft;
         const destW = fw * SPRITE_SCALE;
         const destH = fh * SPRITE_SCALE;
-    
         if (img.complete && img.naturalWidth > 0) {
           ctx.drawImage(
             img,
@@ -305,29 +319,25 @@ const Runner = ({ grid, paused }: RunnerProps) => {
         raf = requestAnimationFrame(loop);
         return;
       }
-    
-      // ── 타이머 업데이트
+
       state.pathTimer += dt;
       if (state.goalLock > 0) state.goalLock -= dt;
       if (state.collideCd > 0) state.collideCd -= dt;
-    
-      // ── 플레이어와 거리/셀 이동량 계산
+
       const pdx = state.targetX - state.px;
       const pdy = state.targetY - state.py;
       const pdist = Math.hypot(pdx, pdy);
-    
-      // ── 모드 전환
+
       if (state.mode === "idle" && pdist < SAFE_INNER) state.mode = "escape";
       else if (state.mode === "escape" && pdist > SAFE_OUTER) state.mode = "idle";
-    
-      // ── 부딪힘 이벤트(살짝 튕기기 용)
+
       if (state.havePlayer && pdist <= COLLIDE_RADIUS && state.collideCd <= 0) {
         state.collideCd = COLLIDE_COOLDOWN;
         window.dispatchEvent(new CustomEvent("enemyA-collide"));
         state.mode = "escape";
         state.pathTimer = PATH_RECALC_TIME;
       }
-    
+
       const pcx = Math.floor(state.targetX / CELL_SIZE);
       const pcy = Math.floor(state.targetY / CELL_SIZE);
       const playerMovedCell = pcx !== state.lastPlayerCell.x || pcy !== state.lastPlayerCell.y;
@@ -335,31 +345,23 @@ const Runner = ({ grid, paused }: RunnerProps) => {
       const playerDy = state.targetY - state.lastPlayerPos.y;
       const playerMovedPx = Math.hypot(playerDx, playerDy);
       const closingFast = pdist < state.lastPdist - 12;
-    
-      // ── 경로 재계산 트리거
+
       if (state.havePlayer && state.mode === "escape" && pdist <= PANIC_RECALC_DIST) {
         state.goalLock = 0;
         panicRecalc();
       } else {
         if (state.havePlayer && state.mode === "escape" &&
-            (state.pathTimer >= PATH_RECALC_TIME || playerMovedCell ||
-             playerMovedPx > PLAYER_PIXEL_TRIGGER || closingFast ||
-             (state.path.length === 0 && pdist < ESCAPE_KEEP) ||
-             (state.goalLock <= 0 && pdist <= SAFE_INNER * 1.1))) {
+          (state.pathTimer >= PATH_RECALC_TIME || playerMovedCell ||
+            playerMovedPx > PLAYER_PIXEL_TRIGGER || closingFast ||
+            (state.path.length === 0 && pdist < ESCAPE_KEEP) ||
+            (state.goalLock <= 0 && pdist <= SAFE_INNER * 1.1))) {
           if (pdist <= SAFE_INNER * 1.1) state.goalLock = 0;
-          if (state.goalLock <= 0 || state.pathTimer >= PATH_RECALC_TIME) panicRecalc();
+          if (state.goalLock <= 0 || pdist <= SAFE_INNER * 1.1) panicRecalc();
+          else if (state.pathTimer >= PATH_RECALC_TIME) panicRecalc();
         }
       }
-    
-      // ── 디버프 상태(슬로우/루트) 갱신: 이동 "직전"에 확인
-      const now = performance.now();
-      if (now > slowUntilRef.current) slowMultRef.current = 1;
-      const rooted = now < rootUntilRef.current;
-    
-      // ── 이동
-      if (rooted) {
-        // rooted면 이동하지 않음(경로는 유지)
-      } else if (state.path.length > 0) {
+
+      if (state.path.length > 0) {
         const idx = Math.min(1, state.path.length - 1);
         const next = state.path[idx];
         const tx = next.x * CELL_SIZE + CELL_SIZE / 2;
@@ -367,60 +369,60 @@ const Runner = ({ grid, paused }: RunnerProps) => {
         const ndx = tx - state.px;
         const ndy = ty - state.py;
         const d2 = Math.hypot(ndx, ndy);
-    
         if (d2 < 8) {
           state.path.shift();
         } else {
           const denom = Math.max(d2, 1e-6);
-          const base = DIFFICULTY.runnerSpeed * CELL_SIZE;
-          const speed = base * slowMultRef.current;       // ✅ 슬로우 반영
+          const speed = DIFFICULTY.runnerSpeed * CELL_SIZE;
           const vx = (ndx / denom) * speed;
           const vy = (ndy / denom) * speed;
-    
+
+          // 방향 기록
           if (Math.abs(vx) > 0.001) state.lastVx = vx;
-    
-          // 큰 이동을 쪼개서 충돌 정확도 확보
+
           const totalDx = vx * dt;
           const totalDy = vy * dt;
           const moveDist = Math.hypot(totalDx, totalDy);
           const maxStep = Math.max(6, Math.floor(TILE_SIZE * SCALE * 0.5));
           const steps = Math.max(1, Math.ceil(moveDist / maxStep));
           const subDt = dt / steps;
-    
-          let nx = state.px, ny = state.py;
+
+          let nx = state.px;
+          let ny = state.py;
           for (let i = 0; i < steps; i++) {
             const moved = moveWithWorldCollision(nx, ny, vx, vy, subDt, grid);
-            nx = moved.x; ny = moved.y;
+            nx = moved.x;
+            ny = moved.y;
           }
           state.px = clamp(nx, 0, WORLD_W);
           state.py = clamp(ny, 0, WORLD_H);
-    
+
           if (globalRunnerState) {
             globalRunnerState.px = state.px;
             globalRunnerState.py = state.py;
           }
+
           window.dispatchEvent(new CustomEvent("runner-pos", { detail: { x: state.px, y: state.py } }));
         }
       } else if (state.mode === "escape" && pdist < ESCAPE_KEEP) {
         state.pathTimer = PATH_RECALC_TIME;
       }
-    
-      // ── 애니메이션 프레임
+
       state.accAnim += dt;
       if (state.accAnim >= 1 / ANIM_FPS) {
         state.frame = (state.frame + 1) % FRAMES;
         state.accAnim = 0;
       }
-    
-      // ── 렌더
+
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       ctx.imageSmoothingEnabled = false;
-    
+
+      // 방향에 따른 시트 선택 + 프레임 그리기
       const useRight = state.lastVx >= 0;
       const sheet = useRight ? imgRight : imgLeft;
       const fw = useRight ? frameWRight : frameWLeft;
       const fh = useRight ? frameHRight : frameHLeft;
-    
+
       if (sheet.complete && sheet.naturalWidth > 0) {
         const destW = fw * SPRITE_SCALE;
         const destH = fh * SPRITE_SCALE;
@@ -432,27 +434,15 @@ const Runner = ({ grid, paused }: RunnerProps) => {
           destW, destH
         );
       }
-    
+
       state.lastPlayerCell = { x: pcx, y: pcy };
       state.lastPlayerPos = { x: state.targetX, y: state.targetY };
       state.lastPdist = pdist;
-    
+
       raf = requestAnimationFrame(loop);
     };
-    
 
     window.dispatchEvent(new CustomEvent("runner-pos", { detail: { x: state.px, y: state.py } }));
-    // 플레이어 버프
-    window.dispatchEvent(new CustomEvent("item-speedup"));
-    window.dispatchEvent(new CustomEvent("item-heal"));
-    window.dispatchEvent(new CustomEvent("item-teleport"));
-    window.dispatchEvent(new CustomEvent("item-shield"));
-
-    // 적 디버프
-    window.dispatchEvent(new CustomEvent("item-slow"));
-    window.dispatchEvent(new CustomEvent("item-root"));
-    window.dispatchEvent(new CustomEvent("item-fear"));
-
     raf = requestAnimationFrame(loop);
 
     return () => {
@@ -460,8 +450,6 @@ const Runner = ({ grid, paused }: RunnerProps) => {
       window.removeEventListener("player-pos", onPlayerPos as EventListener);
       window.removeEventListener("reposition-mobs", onRepositionMobs as EventListener);
       window.removeEventListener("reposition-mobs", onRepositionMobs as EventListener);
-      window.removeEventListener("item-slow", onSlow);
-      window.removeEventListener("item-root", onRoot);
     };
   }, [grid, paused, difficultyVersion]); // 기존 의존성 유지
 

@@ -1,4 +1,3 @@
-// FILE: src/components/Character.tsx
 import { useEffect, useRef } from "react";
 import downPng from "../../assets/character_up.png";
 import leftPng from "../../assets/character_left.png";
@@ -67,7 +66,6 @@ const Character = ({ grid, paused }: CharacterProps) => {
     canvas.style.imageRendering = "pixelated";
     canvas.style.backgroundColor = "transparent";
 
-
     const WORLD_W = MAP_WIDTH * TILE_SIZE * SCALE;
     const WORLD_H = MAP_HEIGHT * TILE_SIZE * SCALE;
     canvas.width = WORLD_W;
@@ -116,9 +114,6 @@ const Character = ({ grid, paused }: CharacterProps) => {
       blinkPhase: 0,
       isDead: false,
       spaceHeld: false,
-      speedMult: 1,
-      speedUntil: 0,
-      shieldUntil: 0,
     };
 
     if (!globalState || !globalState.initialized) {
@@ -169,13 +164,12 @@ const Character = ({ grid, paused }: CharacterProps) => {
       const ce = e as CustomEvent<{ dmg?: number }>;
       if (state.hp <= 0 || state.isDead) return;
       const now = performance.now();
-      if (now < state.invincibleUntil || now < state.shieldUntil) return;
+      if (now < state.invincibleUntil) return;
 
       const dmg = Math.max(1, Math.floor(ce.detail?.dmg ?? 1));
       state.hp = Math.max(0, state.hp - dmg);
       state.invincibleUntil = now + 1000;
 
-      
       if (state.hp === 0) {
         state.isDead = true;
         window.dispatchEvent(new CustomEvent("player-dead"));
@@ -219,38 +213,7 @@ const Character = ({ grid, paused }: CharacterProps) => {
       }
       // slot === 2 등은 프로젝트 규칙에 맞춰 확장
     };
-
-    const onSpeedUp = () => {
-      const now = performance.now();
-      state.speedMult = 1.6;        // 이동속도 1.6배
-      state.speedUntil = now + 4000; // 4초
-      state.effects.push({ x: state.px, y: state.py, t: 0, life: 0.25, kind: "pulse" });
-    };
-
-    const onHeal = () => {
-      state.hp = Math.min(state.maxHP, state.hp + 1);
-      state.effects.push({ x: state.px, y: state.py, t: 0, life: 0.25, kind: "heal" });
-    };
-
-    const onTeleport = () => {
-      const spawn = findSpawnPoint(grid, { clearance: 0 });
-      state.px = spawn.x; state.py = spawn.y;
-      if (globalState) { globalState.px = state.px; globalState.py = state.py; }
-      state.effects.push({ x: state.px, y: state.py, t: 0, life: 0.25, kind: "blink" });
-    };
-
-    const onShield = () => {
-      state.shieldUntil = performance.now() + 1500; // 1.5초 무적
-      state.invincibleUntil = Math.max(state.invincibleUntil, state.shieldUntil);
-      state.effects.push({ x: state.px, y: state.py, t: 0, life: 0.3, kind: "blink" });
-    };
-
-
     window.addEventListener("use-item", onUseItem as EventListener);
-    window.addEventListener("item-speedup", onSpeedUp);
-    window.addEventListener("item-heal", onHeal);
-    window.addEventListener("item-teleport", onTeleport);
-    window.addEventListener("item-shield", onShield);
 
     const octantToDir: DirType[] = [
       DIR.LEFT,
@@ -262,7 +225,6 @@ const Character = ({ grid, paused }: CharacterProps) => {
       DIR.UP,
       DIR.UP_LEFT,
     ];
-
     const angleToOctant = (theta: number) => {
       const step = Math.PI / 4;
       const idx = Math.round((theta + Math.PI) / step) % 8;
@@ -320,21 +282,14 @@ const Character = ({ grid, paused }: CharacterProps) => {
       if (rtK) vx += 1;
 
       if (vx !== 0 || vy !== 0) {
-        const now = performance.now();
-        if (now > state.speedUntil) {
-          state.speedMult = 1;
-          state.speedUntil = 0;
-        }
-        const MOVE = MOVE_SPEED * state.speedMult;
-      
         const len = Math.hypot(vx, vy);
-        vx = (vx / len) * MOVE;
-        vy = (vy / len) * MOVE;
-      
+        vx = (vx / len) * MOVE_SPEED;
+        vy = (vy / len) * MOVE_SPEED;
+
         const theta = Math.atan2(vy, vx);
         const oct = angleToOctant(theta);
         state.dir = octantToDir[oct];
-      
+
         state.accAnim += dt;
         if (state.accAnim >= 1 / ANIM_FPS) {
           state.frame = (state.frame + 1) % FRAMES;
@@ -445,10 +400,6 @@ const Character = ({ grid, paused }: CharacterProps) => {
       window.removeEventListener("player-hit", onPlayerHit as EventListener);
       window.removeEventListener("reset-hp", onResetHP);
       window.removeEventListener("use-item", onUseItem as EventListener);
-      window.removeEventListener("item-speedup", onSpeedUp);
-      window.removeEventListener("item-heal", onHeal);
-      window.removeEventListener("item-teleport", onTeleport);
-      window.removeEventListener("item-shield", onShield);
     };
   }, [grid, paused]);
 
