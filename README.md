@@ -28,8 +28,8 @@
 5. 발표는 11월 7일에 한다.(발표자료, 웹게임 만들기)
 
 
-## 수정해야할 것 - 11/06 00:41 추가
-- 아이템 추가
+## 수정해야할 것 - 11/06 13:44 추가
+* 아이템 추가
 ```bash
 B 아이템 (Ball)
 속도 업
@@ -41,3 +41,12 @@ S 아이템 (Strike)
 적 속박
 숫자 하나 공개
 ```
+
+* 난이도 별 몹 수 수정
+
+* 효과음 넣기
+<https://www.sellbuymusic.com/search/soundeffect>
+<https://pixabay.com/ko/sound-effects/>
+
+* PPT 만들기
+  
