@@ -59,17 +59,10 @@ function Agency({ difficulty, onMainMenu }: AgencyProps) {
   }, [difficulty]);
 
   function decideGrade(strike: number, ball: number, out: number): ItemGrade | null {
-    // 조건 표 그대로 구현
-    if ((strike === 1 && ball === 2 && out === 1) ||
-      (strike === 2 && ball === 1 && out === 1)) {
-      return "S";
-    }
-    if (strike === 0 && ball === 3 && out === 1) return "B";
-    if (strike === 0 && ball === 0 && out === 4) return null;
-
     // (확장 규칙) S > B > O 우선순위 — 예외 케이스에 대비
     if (strike > 0) return "S";
     if (ball > 0) return "B";
+    if (out > 0) return null;
     return null;
   }
 
@@ -99,11 +92,6 @@ function Agency({ difficulty, onMainMenu }: AgencyProps) {
         window.dispatchEvent(new CustomEvent("item-teleport"));
         break;
       }
-      case "BALL": {
-        // 체이서 잠깐 멈춤(혹은 느리게) 3.5초
-        window.dispatchEvent(new CustomEvent("item-bondage", { detail: { slow: 0.2, duration: 3500 } }));
-        break;
-      }
       case "VISIBILITY": {
         // 시야 8초 밝게
         window.dispatchEvent(new CustomEvent("item-visibility", { detail: { radius: 360, duration: 8000 } }));
@@ -112,11 +100,6 @@ function Agency({ difficulty, onMainMenu }: AgencyProps) {
       case "BONDAGE": {
         // 적 속박 5초 (더 강력)
         window.dispatchEvent(new CustomEvent("item-bondage", { detail: { slow: 0.05, duration: 5000 } }));
-        break;
-      }
-      case "STRIKE": {
-        // 체이서 강제 경직 + 리스폰 느낌: 재배치
-        window.dispatchEvent(new CustomEvent("reposition-mobs"));
         break;
       }
       case "KEY": {

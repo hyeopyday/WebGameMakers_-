@@ -11,12 +11,10 @@ export type ItemGrade = "S" | "B";
 
 export type ItemId =
   // B 등급
-  | "BALL"
   | "SPEED_UP"
   | "RECOVERY"
   | "TELEPORT"
   // S 등급
-  | "STRIKE"
   | "VISIBILITY"
   | "BONDAGE"
   | "KEY";
