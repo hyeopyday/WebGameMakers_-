@@ -1,6 +1,9 @@
-// FILE: src/component/UI/GameOver.tsx
 import { useEffect, useState } from "react";
+import { audioManager } from "../../utils/audioManager";
 import "./GameOver.css";
+import gameoverImg from "../../assets/gameover/gameover.png";
+import restartBtn from "../../assets/gameover/다시하기.png";
+import mainMenuBtn from "../../assets/gameover/메인으로.png";
 
 interface GameOverProps {
   onRestart: () => void;
@@ -13,6 +16,8 @@ const GameOver = ({ onRestart, onMainMenu }: GameOverProps) => {
   useEffect(() => {
     const handlePlayerDead = () => {
       setIsVisible(true);
+      audioManager.stopBGM(true);
+      audioManager.playSFX("/sounds/game_over.mp3");
     };
 
     window.addEventListener("player-dead", handlePlayerDead);
@@ -25,41 +30,52 @@ const GameOver = ({ onRestart, onMainMenu }: GameOverProps) => {
   if (!isVisible) return null;
 
   const handleRestart = () => {
+    audioManager.playSFX("/sounds/click.mp3");
     setIsVisible(false);
     window.dispatchEvent(new CustomEvent("reset-hp"));
     window.dispatchEvent(new CustomEvent("reposition-mobs"));
+    
+    setTimeout(() => {
+      audioManager.playBGM("/sounds/playing_game.mp3", true);
+    }, 300);
+    
     onRestart();
   };
 
   const handleMainMenu = () => {
+    audioManager.playSFX("/sounds/click.mp3");
     setIsVisible(false);
+    
+    setTimeout(() => {
+      audioManager.playBGM("/sounds/main.mp3", true);
+    }, 300);
+    
     onMainMenu();
   };
 
   return (
     <div className="gameover-overlay">
       <div className="gameover-container">
-        <div className="gameover-content">
-          <h1 className="gameover-title">게임 오버</h1>
-          <p className="gameover-subtitle">당신은 패배했습니다</p>
+        <img 
+          src={gameoverImg} 
+          alt="Game Over" 
+          className="gameover-title-image"
+        />
 
-          <div className="gameover-buttons">
-            <button
-              className="gameover-button restart-btn"
-              onClick={handleRestart}
-            >
-              <span className="button-icon">🔄</span>
-              <span className="button-text">재도전</span>
-            </button>
+        <div className="gameover-buttons">
+          <button
+            className="gameover-button restart-btn"
+            onClick={handleRestart}
+          >
+            <img src={restartBtn} alt="다시하기" />
+          </button>
 
-            <button
-              className="gameover-button menu-btn"
-              onClick={handleMainMenu}
-            >
-              <span className="button-icon">🏠</span>
-              <span className="button-text">메인 메뉴</span>
-            </button>
-          </div>
+          <button
+            className="gameover-button mainmenu-btn"
+            onClick={handleMainMenu}
+          >
+            <img src={mainMenuBtn} alt="메인으로" />
+          </button>
         </div>
       </div>
     </div>

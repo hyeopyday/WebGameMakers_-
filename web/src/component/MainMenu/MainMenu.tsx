@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { MAP_WIDTH, MAP_HEIGHT, TILE_SIZE, SCALE } from "../../type/type";
+import { audioManager } from "../../utils/audioManager";
 import titleImg from "../../assets/title.png";
 import difficultyImg from "../../assets/difficulty.png";
 import backgroundImg from "../../assets/background.png";
@@ -14,6 +15,8 @@ import checkboxGreenImg from "../../assets/checkbox_green.png";
 import langButtonImg from "../../assets/lang_button.png";
 import "./MainMenu.css";
 import { type Mode } from "../../type/numberBaseball";
+import { setDifficulty } from "../../type/difficulty";
+
 
 interface MainMenuProps {
 onStartGame: (mode: Mode) => void;}
@@ -33,7 +36,6 @@ const MainMenu = ({ onStartGame }: MainMenuProps) => {
   const [language, setLanguage] = useState<"ko" | "en" | "ja">("ko");
   const [showLanguageDropdown, setShowLanguageDropdown] = useState(false);
 
-  // 다국어 지원
   const translations = {
     ko: {
       gameStart: "게임 시작",
@@ -82,21 +84,29 @@ const MainMenu = ({ onStartGame }: MainMenuProps) => {
   const t = translations[language];
 
   useEffect(() => {
-    // 타이틀 애니메이션 시작
     setTimeout(() => setShowTitle(true), 100);
-    // 타이틀 애니메이션 완료 후 메뉴 버튼 표시
     setTimeout(() => setShowMenu(true), 1500);
+    
+    audioManager.playBGM("/sounds/main.mp3", true);
+    
+    return () => {
+      // 언마운트 시 BGM 유지
+    };
   }, []);
 
-  // ESC 키 이벤트 핸들러
+  useEffect(() => {
+    const savedBGM = audioManager.getBGMVolume();
+    const savedSFX = audioManager.getSFXVolume();
+    setBgmVolume(savedBGM);
+    setSfxVolume(savedSFX);
+  }, []);
+
   useEffect(() => {
     const handleEsc = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         if (showLanguageDropdown) {
-          // 언어 드롭다운 열려있으면 닫기
           setShowLanguageDropdown(false);
         } else if (showDifficulty || showGameInfo || showSettings) {
-          // 모달 닫기
           setIsClosing(true);
           setTimeout(() => {
             setShowDifficulty(false);
@@ -113,23 +123,26 @@ const MainMenu = ({ onStartGame }: MainMenuProps) => {
   }, [showDifficulty, showGameInfo, showSettings, showLanguageDropdown]);
 
   const handleGameStart = () => {
+    audioManager.playSFX("/sounds/click.mp3");
     setShowDifficulty(true);
     setIsClosing(false);
   };
 
   const handleGameInfo = () => {
+    audioManager.playSFX("/sounds/click.mp3");
     setShowGameInfo(true);
     setIsClosing(false);
   };
 
   const handleSettings = () => {
+    audioManager.playSFX("/sounds/click.mp3");
     setShowSettings(true);
     setIsClosing(false);
   };
 
   const handleFullscreenToggle = () => {
+    audioManager.playSFX("/sounds/click.mp3");
     if (!isFullscreen) {
-      // 전체화면으로 전환
       const elem = document.documentElement;
       if (elem.requestFullscreen) {
         elem.requestFullscreen();
@@ -140,8 +153,8 @@ const MainMenu = ({ onStartGame }: MainMenuProps) => {
   };
 
   const handleWindowModeToggle = () => {
+    audioManager.playSFX("/sounds/click.mp3");
     if (isFullscreen && document.fullscreenElement) {
-      // 윈도우 모드로 전환
       document.exitFullscreen();
       setIsFullscreen(false);
       setIsWindowMode(true);
@@ -149,8 +162,29 @@ const MainMenu = ({ onStartGame }: MainMenuProps) => {
   };
 
   const handleLanguageSelect = (lang: "ko" | "en" | "ja") => {
+    audioManager.playSFX("/sounds/click.mp3");
     setLanguage(lang);
     setShowLanguageDropdown(false);
+  };
+
+const handleDifficultySelect = (mode: Mode) => {
+  audioManager.playSFX("/sounds/click.mp3");
+  setDifficulty(mode);
+  onStartGame(mode);
+};
+
+  const handleBgmVolumeChange = (index: number) => {
+    audioManager.playSFX("/sounds/click.mp3");
+    const newVolume = index + 1;
+    setBgmVolume(newVolume);
+    audioManager.setBGMVolume(newVolume);
+  };
+
+  const handleSfxVolumeChange = (index: number) => {
+    const newVolume = index + 1;
+    setSfxVolume(newVolume);
+    audioManager.setSFXVolume(newVolume);
+    audioManager.playSFX("/sounds/click.mp3");
   };
 
   const getLanguageName = (lang: "ko" | "en" | "ja") => {
@@ -160,10 +194,6 @@ const MainMenu = ({ onStartGame }: MainMenuProps) => {
       ja: "日本語",
     };
     return names[lang];
-  };
-
-  const handleDifficultySelect = (mode: Mode) => {
-    onStartGame(mode);
   };
 
   const canvasWidth = MAP_WIDTH * TILE_SIZE * SCALE;
@@ -181,12 +211,10 @@ const MainMenu = ({ onStartGame }: MainMenuProps) => {
         filter: `brightness(${brightness}%)`,
       }}
     >
-      {/* 타이틀 이미지 */}
       <div className={`title-wrapper ${showTitle ? "show" : ""}`}>
         <img src={titleImg} alt="Title" className="title-image" />
       </div>
 
-      {/* 메인 메뉴 버튼들 */}
       {showMenu && !showDifficulty && !showGameInfo && !showSettings && (
         <div className="menu-buttons">
           <button 
@@ -210,7 +238,6 @@ const MainMenu = ({ onStartGame }: MainMenuProps) => {
         </div>
       )}
 
-      {/* 난이도 선택 오버레이 */}
       {showDifficulty && (
         <>
           <div className={`difficulty-overlay ${isClosing ? "closing" : ""}`} />
@@ -246,7 +273,6 @@ const MainMenu = ({ onStartGame }: MainMenuProps) => {
         </>
       )}
 
-      {/* 게임 설명 오버레이 */}
       {showGameInfo && (
         <>
           <div className={`difficulty-overlay ${isClosing ? "closing" : ""}`} />
@@ -261,19 +287,16 @@ const MainMenu = ({ onStartGame }: MainMenuProps) => {
         </>
       )}
 
-      {/* 설정 오버레이 */}
       {showSettings && (
         <>
           <div className={`difficulty-overlay ${isClosing ? "closing" : ""}`} />
           <div className={`final-settings-modal ${isClosing ? "closing" : ""}`}>
-            {/* 설정 배경 이미지 */}
             <img src={settingsBgImg} alt="" className="settings-bg-image" />
 
-
-            {/* 닫기 버튼 */}
             <button
               className="settings-close-btn"
               onClick={() => {
+                audioManager.playSFX("/sounds/click.mp3");
                 setIsClosing(true);
                 setTimeout(() => {
                   setShowSettings(false);
@@ -285,9 +308,7 @@ const MainMenu = ({ onStartGame }: MainMenuProps) => {
               ✕
             </button>
 
-            {/* 설정 내용 */}
             <div className="final-settings-content">
-              {/* 배경음악 */}
               <div className="final-settings-row">
                 <img src={volIconImg} alt="" className="final-icon" />
                 <div className="final-volume-bars">
@@ -297,13 +318,12 @@ const MainMenu = ({ onStartGame }: MainMenuProps) => {
                       src={i < bgmVolume ? barGreenImg : barBrownImg}
                       alt=""
                       className="final-bar"
-                      onClick={() => setBgmVolume(i + 1)}
+                      onClick={() => handleBgmVolumeChange(i)}
                     />
                   ))}
                 </div>
               </div>
 
-              {/* 효과음 */}
               <div className="final-settings-row">
                 <img src={musIconImg} alt="" className="final-icon" />
                 <div className="final-volume-bars">
@@ -313,13 +333,12 @@ const MainMenu = ({ onStartGame }: MainMenuProps) => {
                       src={i < sfxVolume ? barGreenImg : barBrownImg}
                       alt=""
                       className="final-bar"
-                      onClick={() => setSfxVolume(i + 1)}
+                      onClick={() => handleSfxVolumeChange(i)}
                     />
                   ))}
                 </div>
               </div>
 
-              {/* 전체화면 */}
               <div className="final-settings-row final-checkbox-row">
                 <img
                   src={isFullscreen ? checkboxBrownImg : checkboxGreenImg}
@@ -330,7 +349,6 @@ const MainMenu = ({ onStartGame }: MainMenuProps) => {
                 <span className="final-label">{t.fullscreen}</span>
               </div>
 
-              {/* 윈도우 모드 */}
               <div className="final-settings-row final-checkbox-row">
                 <img
                   src={isWindowMode ? checkboxBrownImg : checkboxGreenImg}
@@ -341,16 +359,17 @@ const MainMenu = ({ onStartGame }: MainMenuProps) => {
                 <span className="final-label">{t.windowMode}</span>
               </div>
 
-              {/* 언어 선택 */}
               <div className="final-settings-row final-language-row">
                 <span className="final-language-title">{t.language}</span>
               </div>
 
-              {/* 언어 버튼 (드롭다운 토글) */}
               <div className="final-language-select">
                 <button
                   className="final-lang-button"
-                  onClick={() => setShowLanguageDropdown(!showLanguageDropdown)}
+                  onClick={() => {
+                    audioManager.playSFX("/sounds/click.mp3");
+                    setShowLanguageDropdown(!showLanguageDropdown);
+                  }}
                   style={{ backgroundImage: `url(${langButtonImg})` }}
                 >
                   <span className="final-lang-text">{getLanguageName(language)}</span>
@@ -359,7 +378,6 @@ const MainMenu = ({ onStartGame }: MainMenuProps) => {
                   </span>
                 </button>
 
-                {/* 언어 드롭다운 */}
                 {showLanguageDropdown && (
                   <div className="final-lang-dropdown">
                     <div
@@ -385,7 +403,6 @@ const MainMenu = ({ onStartGame }: MainMenuProps) => {
               </div>
             </div>
 
-            {/* ESC 힌트 */}
             <div className="final-esc-hint">{t.escHint}</div>
           </div>
         </>

@@ -1,5 +1,5 @@
 // FILE: src/component/mob/Runner.tsx
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { Cell } from "../../type/type";
 import {
   MAP_WIDTH,
@@ -10,14 +10,16 @@ import {
   WALL,
 } from "../../type/type";
 import { moveWithWorldCollision } from "./Physic/Physic";
-import runnerPng from "../../assets/Runner.png";
+// 좌/우 이동용 4프레임 스프라이트 시트
+import mimicLeft from "../../assets/Runner2.png";
+import mimicRight from "../../assets/Runner.png";
+import { DIFFICULTY, DIFFICULTY_CHANGED } from "../../type/difficulty";
 
 interface RunnerProps {
-  grid: Cell[][]; 
+  grid: Cell[][];
   paused?: boolean;
 }
 
-const RUNNER_SPEED = 175;
 const CELL_SIZE = TILE_SIZE * SCALE;
 const PATH_RECALC_TIME = 0.35;
 const SAFE_INNER = 300;
@@ -27,15 +29,13 @@ const GOAL_LOCK_TIME = 0.2;
 const PANIC_RECALC_DIST = SAFE_INNER;
 const PLAYER_PIXEL_TRIGGER = 24;
 
-const SPRITE_W = 16;
-const SPRITE_H = 16;
+// ▼ 4프레임 시트. 프레임 크기는 이미지 로드 후 계산.
+const FRAMES = 6;
 const SPRITE_SCALE = 2;
-const FRAMES = 1;
-const ANIM_FPS = 8;
+const ANIM_FPS = 10;
 const COLLIDE_RADIUS = 20;
 const COLLIDE_COOLDOWN = 0.8;
 
-// ✅ 위치 유지를 위한 전역 상태
 let globalRunnerState: {
   px: number;
   py: number;
@@ -145,7 +145,8 @@ function pickEscapePath(
 
 const Runner = ({ grid, paused }: RunnerProps) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  
+  const [difficultyVersion, setDifficultyVersion] = useState(0);
+
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -165,8 +166,25 @@ const Runner = ({ grid, paused }: RunnerProps) => {
     canvas.style.backgroundColor = "transparent";
     canvas.style.zIndex = "5";
 
-    const img = new Image();
-    img.src = runnerPng;
+    // 좌/우 시트 로드
+    const imgLeft = new Image();
+    imgLeft.src = mimicLeft;
+    const imgRight = new Image();
+    imgRight.src = mimicRight;
+
+    // 프레임 크기(런타임 계산, 기본값은 64)
+    let frameWLeft = 64, frameHLeft = 64;
+    let frameWRight = 64, frameHRight = 64;
+    imgLeft.onload = () => {
+      frameWLeft = Math.floor(imgLeft.naturalWidth / FRAMES) || frameWLeft;
+      frameHLeft = imgLeft.naturalHeight || frameHLeft;
+    };
+    imgRight.onload = () => {
+      frameWRight = Math.floor(imgRight.naturalWidth / FRAMES) || frameWRight;
+      frameHRight = imgRight.naturalHeight || frameHRight;
+    };
+
+    console.log(`[Runner] 난이도: ${DIFFICULTY.name}, 속도: ${DIFFICULTY.runnerSpeed} 타일/초`);
 
     const state = {
       px: 0, py: 0, frame: 0, accAnim: 0,
@@ -181,9 +199,9 @@ const Runner = ({ grid, paused }: RunnerProps) => {
       lastPdist: Number.POSITIVE_INFINITY,
       preferLeft: true,
       collideCd: 0,
+      lastVx: 1, // ≥0 오른쪽, <0 왼쪽
     };
 
-    // ✅ 최초 한 번만 스폰
     if (!globalRunnerState || !globalRunnerState.initialized) {
       const s = findSpawnPoint(grid, { clearance: 0 });
       state.px = s.x;
@@ -202,26 +220,17 @@ const Runner = ({ grid, paused }: RunnerProps) => {
     };
     window.addEventListener("player-pos", onPlayerPos as EventListener);
 
-    // ✅ 몹 재배치 이벤트 리스너
     const onRepositionMobs = () => {
-      // 플레이어 반대 끝 방향으로 이동
       const WORLD_W = MAP_WIDTH * TILE_SIZE * SCALE;
       const WORLD_H = MAP_HEIGHT * TILE_SIZE * SCALE;
-      
-      // 플레이어가 왼쪽에 있으면 오른쪽으로, 위에 있으면 아래로
-      const targetCellX = state.targetX < WORLD_W / 2 
-        ? Math.floor(MAP_WIDTH * 0.8) 
-        : Math.floor(MAP_WIDTH * 0.2);
-      const targetCellY = state.targetY < WORLD_H / 2 
-        ? Math.floor(MAP_HEIGHT * 0.8) 
-        : Math.floor(MAP_HEIGHT * 0.2);
-      
-      // 해당 셀이 벽이면 근처에서 길 찾기
+
+      const targetCellX = state.targetX < WORLD_W / 2 ? Math.floor(MAP_WIDTH * 0.8) : Math.floor(MAP_WIDTH * 0.2);
+      const targetCellY = state.targetY < WORLD_H / 2 ? Math.floor(MAP_HEIGHT * 0.8) : Math.floor(MAP_HEIGHT * 0.2);
+
       let foundX = targetCellX;
       let foundY = targetCellY;
       let found = false;
-      
-      // 주변 탐색
+
       for (let radius = 0; radius < 10 && !found; radius++) {
         for (let dy = -radius; dy <= radius && !found; dy++) {
           for (let dx = -radius; dx <= radius && !found; dx++) {
@@ -237,21 +246,18 @@ const Runner = ({ grid, paused }: RunnerProps) => {
           }
         }
       }
-      
-      // 새 위치 설정
+
       state.px = (foundX + 0.5) * CELL_SIZE;
       state.py = (foundY + 1) * CELL_SIZE;
-      
-      // 전역 상태 업데이트
+
       if (globalRunnerState) {
         globalRunnerState.px = state.px;
         globalRunnerState.py = state.py;
       }
-      
-      // 경로 초기화
+
       state.path = [];
       state.mode = "idle";
-      
+
       console.log(`Runner repositioned to opposite corner: (${foundX}, ${foundY})`);
     };
     window.addEventListener("reposition-mobs", onRepositionMobs as EventListener);
@@ -292,13 +298,18 @@ const Runner = ({ grid, paused }: RunnerProps) => {
       if (paused) {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         ctx.imageSmoothingEnabled = false;
-    
+
+        // 일시정지 시 현재 방향 기준 첫 프레임 표시
+        const useRight = state.lastVx >= 0;
+        const img = useRight ? imgRight : imgLeft;
+        const fw = useRight ? frameWRight : frameWLeft;
+        const fh = useRight ? frameHRight : frameHLeft;
+        const destW = fw * SPRITE_SCALE;
+        const destH = fh * SPRITE_SCALE;
         if (img.complete && img.naturalWidth > 0) {
-          const destW = SPRITE_W * SPRITE_SCALE;
-          const destH = SPRITE_H * SPRITE_SCALE;
           ctx.drawImage(
             img,
-            0, 0, SPRITE_W, SPRITE_H,
+            0, 0, fw, fh,
             Math.floor(state.px - destW / 2),
             Math.floor(state.py - destH),
             destW, destH
@@ -361,13 +372,30 @@ const Runner = ({ grid, paused }: RunnerProps) => {
           state.path.shift();
         } else {
           const denom = Math.max(d2, 1e-6);
-          const vx = (ndx / denom) * RUNNER_SPEED;
-          const vy = (ndy / denom) * RUNNER_SPEED;
-          const moved = moveWithWorldCollision(state.px, state.py, vx, vy, dt, grid);
-          state.px = clamp(moved.x, 0, WORLD_W);
-          state.py = clamp(moved.y, 0, WORLD_H);
+          const speed = DIFFICULTY.runnerSpeed * CELL_SIZE;
+          const vx = (ndx / denom) * speed;
+          const vy = (ndy / denom) * speed;
 
-          // ✅ 전역 상태 업데이트
+          // 방향 기록
+          if (Math.abs(vx) > 0.001) state.lastVx = vx;
+
+          const totalDx = vx * dt;
+          const totalDy = vy * dt;
+          const moveDist = Math.hypot(totalDx, totalDy);
+          const maxStep = Math.max(6, Math.floor(TILE_SIZE * SCALE * 0.5));
+          const steps = Math.max(1, Math.ceil(moveDist / maxStep));
+          const subDt = dt / steps;
+
+          let nx = state.px;
+          let ny = state.py;
+          for (let i = 0; i < steps; i++) {
+            const moved = moveWithWorldCollision(nx, ny, vx, vy, subDt, grid);
+            nx = moved.x;
+            ny = moved.y;
+          }
+          state.px = clamp(nx, 0, WORLD_W);
+          state.py = clamp(ny, 0, WORLD_H);
+
           if (globalRunnerState) {
             globalRunnerState.px = state.px;
             globalRunnerState.py = state.py;
@@ -387,12 +415,19 @@ const Runner = ({ grid, paused }: RunnerProps) => {
 
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       ctx.imageSmoothingEnabled = false;
-      if (img.complete && img.naturalWidth > 0) {
-        const destW = SPRITE_W * SPRITE_SCALE;
-        const destH = SPRITE_H * SPRITE_SCALE;
+
+      // 방향에 따른 시트 선택 + 프레임 그리기
+      const useRight = state.lastVx >= 0;
+      const sheet = useRight ? imgRight : imgLeft;
+      const fw = useRight ? frameWRight : frameWLeft;
+      const fh = useRight ? frameHRight : frameHLeft;
+
+      if (sheet.complete && sheet.naturalWidth > 0) {
+        const destW = fw * SPRITE_SCALE;
+        const destH = fh * SPRITE_SCALE;
         ctx.drawImage(
-          img,
-          0, 0, SPRITE_W, SPRITE_H,
+          sheet,
+          fw * state.frame, 0, fw, fh,
           Math.floor(state.px - destW / 2),
           Math.floor(state.py - destH),
           destW, destH
@@ -413,8 +448,19 @@ const Runner = ({ grid, paused }: RunnerProps) => {
       cancelAnimationFrame(raf);
       window.removeEventListener("player-pos", onPlayerPos as EventListener);
       window.removeEventListener("reposition-mobs", onRepositionMobs as EventListener);
+      window.removeEventListener("reposition-mobs", onRepositionMobs as EventListener);
     };
-  }, [grid, paused]);
+  }, [grid, paused, difficultyVersion]); // 기존 의존성 유지
+
+  // 난이도 변경 감지
+  useEffect(() => {
+    const handleDifficultyChange = () => {
+      console.log(`[Runner] 난이도 변경 감지: ${DIFFICULTY.name}`);
+      setDifficultyVersion(v => v + 1);
+    };
+    window.addEventListener(DIFFICULTY_CHANGED, handleDifficultyChange);
+    return () => window.removeEventListener(DIFFICULTY_CHANGED, handleDifficultyChange);
+  }, []);
 
   return (
     <canvas

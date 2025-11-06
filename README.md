@@ -50,3 +50,7 @@ S 아이템 (Strike)
   - <https://pixabay.com/ko/sound-effects/>
 
 * PPT 만들기
+<<<<<<< HEAD
+=======
+  
+>>>>>>> Item_V2
