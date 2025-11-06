@@ -1,0 +1,112 @@
+/* GameVictory.css */
+.victory-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: radial-gradient(ellipse at center, rgba(50, 40, 0, 0.95) 0%, rgba(0, 0, 0, 0.98) 100%);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 20000;
+  animation: victoryFadeIn 0.8s ease-out;
+  backdrop-filter: blur(10px);
+}
+
+@keyframes victoryFadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.victory-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+
+/* Victory 이미지 */
+.victory-image {
+  width: 800px;
+  height: auto;
+  image-rendering: pixelated;
+  image-rendering: -moz-crisp-edges;
+  image-rendering: crisp-edges;
+  filter: drop-shadow(0 10px 40px rgba(255, 200, 0, 0.6));
+  animation: victoryAppear 0.8s cubic-bezier(0.34, 1.56, 0.64, 1),
+             characterDance 0.5s ease-in-out 0.8s 8;
+}
+
+@keyframes victoryAppear {
+  from {
+    transform: translateY(-100px) scale(0.7);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0) scale(1);
+    opacity: 1;
+  }
+}
+
+/* 캐릭터 춤추는 애니메이션 - 골반 흔들기 */
+@keyframes characterDance {
+  0%, 100% {
+    transform: translateY(0) scale(1) rotate(0deg);
+  }
+  25% {
+    transform: translateY(-15px) scale(1.05) rotate(-3deg);
+  }
+  50% {
+    transform: translateY(0) scale(1) rotate(0deg);
+  }
+  75% {
+    transform: translateY(-15px) scale(1.05) rotate(3deg);
+  }
+}
+
+/* 반짝이는 효과 */
+.victory-image::before {
+  content: '';
+  position: absolute;
+  top: -10%;
+  left: -10%;
+  width: 120%;
+  height: 120%;
+  background: linear-gradient(
+    45deg,
+    transparent 30%,
+    rgba(255, 215, 0, 0.3) 50%,
+    transparent 70%
+  );
+  animation: victoryShine 2s linear infinite;
+  pointer-events: none;
+}
+
+@keyframes victoryShine {
+  0% {
+    transform: translateX(-100%) rotate(45deg);
+  }
+  100% {
+    transform: translateX(100%) rotate(45deg);
+  }
+}
+
+/* 반응형 */
+@media (max-width: 768px) {
+  .victory-image {
+    width: 600px;
+  }
+}
+
+@media (max-width: 480px) {
+  .victory-image {
+    width: 90vw;
+    max-width: 450px;
+  }
+}

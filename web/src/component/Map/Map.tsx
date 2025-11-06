@@ -152,7 +152,7 @@ const Map = ({ grid, paused }: MapProps) => {
         width={MAP_WIDTH * TILE_SIZE * SCALE}
         height={MAP_HEIGHT * TILE_SIZE * SCALE}
       />
-       <Character grid={grid} paused={paused} />
+      <Character grid={grid} paused={paused} />
       <Chaser grid={grid} paused={paused} />
       <Runner grid={grid} paused={paused} />
       <ArrowOverlay minDist={120} maxDist={1200} size={28} ring={36} />

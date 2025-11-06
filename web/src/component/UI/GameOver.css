@@ -1,0 +1,202 @@
+/* GameOver.css */
+.gameover-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0, 0, 0, 0.95);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 20000;
+  animation: gameoverFadeIn 0.5s ease-out;
+  backdrop-filter: blur(8px);
+}
+
+@keyframes gameoverFadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.gameover-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 60px;
+  position: relative;
+}
+
+/* GAME OVER 타이틀 이미지 */
+.gameover-title-image {
+  width: 700px;
+  height: auto;
+  image-rendering: pixelated;
+  image-rendering: -moz-crisp-edges;
+  image-rendering: crisp-edges;
+  filter: drop-shadow(0 10px 30px rgba(139, 0, 0, 0.8));
+  animation: titleSlideDown 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+  z-index: 2;
+}
+
+@keyframes titleSlideDown {
+  from {
+    transform: translateY(-100px) scale(0.8);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0) scale(1);
+    opacity: 1;
+  }
+}
+
+/* 피 튀는 이미지 */
+.gameover-blood-image {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 1600px;
+  height: auto;
+  image-rendering: pixelated;
+  image-rendering: -moz-crisp-edges;
+  image-rendering: crisp-edges;
+  z-index: 3;
+  pointer-events: none;
+  /* ✅ 애니메이션은 한 번만 실행, 끝나면 마지막 상태 유지 */
+  animation: bloodSplash 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) 1 forwards;
+}
+
+@keyframes bloodSplash {
+  0% {
+    transform: translate(-50%, -50%) scale(0);
+    opacity: 0;
+    filter: blur(10px);
+  }
+  50% {
+    transform: translate(-50%, -50%) scale(1.3);
+    opacity: 1;
+    filter: blur(2px);
+  }
+  100% {
+    transform: translate(-50%, -50%) scale(1);
+    opacity: 1;
+    filter: blur(0);
+  }
+}
+
+/* 버튼 컨테이너 */
+.gameover-buttons {
+  display: flex;
+  gap: 40px;
+  justify-content: center;
+  align-items: center;
+  z-index: 4;
+  animation: buttonsSlideUp 0.6s ease-out 2s both;
+}
+
+@keyframes buttonsSlideUp {
+  from {
+    opacity: 0;
+    transform: translateY(50px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.gameover-button {
+  background: transparent;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.6));
+}
+
+.gameover-button img {
+  width: 280px;
+  height: auto;
+  image-rendering: pixelated;
+  image-rendering: -moz-crisp-edges;
+  image-rendering: crisp-edges;
+  display: block;
+}
+
+.gameover-button:hover {
+  transform: scale(1.1) translateY(-5px);
+  filter: drop-shadow(0 8px 20px rgba(255, 0, 0, 0.4));
+}
+
+.gameover-button:active {
+  transform: scale(1.05) translateY(-2px);
+}
+
+.restart-btn {
+  animation: buttonPopIn 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) 2.2s both;
+}
+
+.mainmenu-btn {
+  animation: buttonPopIn 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) 2.4s both;
+}
+
+@keyframes buttonPopIn {
+  0% {
+    opacity: 0;
+    transform: scale(0) translateY(30px);
+  }
+  60% {
+    transform: scale(1.15) translateY(0);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+/* 반응형 */
+@media (max-width: 768px) {
+  .gameover-title-image {
+    width: 500px;
+  }
+
+  .gameover-blood-image {
+    width: 1200px;
+  }
+
+  .gameover-button img {
+    width: 200px;
+  }
+
+  .gameover-buttons {
+    gap: 30px;
+  }
+
+  .gameover-container {
+    gap: 50px;
+  }
+}
+
+@media (max-width: 480px) {
+  .gameover-title-image {
+    width: 350px;
+  }
+
+  .gameover-blood-image {
+    width: 900px;
+  }
+
+  .gameover-button img {
+    width: 150px;
+  }
+
+  .gameover-buttons {
+    flex-direction: column;
+    gap: 20px;
+  }
+}

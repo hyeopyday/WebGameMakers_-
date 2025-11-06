@@ -1,6 +1,6 @@
 // src/ui/NumberBaseball.tsx
 import React, { useEffect, useMemo, useState } from "react";
-import { judgeGuess, validateGuess, formatAttemptLine, MODE_LENGTH, type Mode } from "../../type/numberBaseball";
+import { judgeGuess, validateGuess, formatAttemptLine, type Mode } from "../../type/numberBaseball";
 
 export type NBResult = {
   guess: string;
@@ -99,20 +99,37 @@ const footStyle: React.CSSProperties = {
   justifyContent: "flex-end",
 };
 
+const winMessageStyle: React.CSSProperties = {
+  background: "linear-gradient(135deg, #0a4a0a 0%, #0a2a0a 100%)",
+  border: "2px solid #00ff00",
+  borderRadius: 8,
+  padding: "16px",
+  margin: "12px 0",
+  textAlign: "center",
+  color: "#00ff00",
+  fontSize: "20px",
+  fontWeight: "bold",
+  textShadow: "0 0 10px rgba(0, 255, 0, 0.8)",
+  animation: "winPulse 1s ease-in-out infinite",
+};
+
 export default function NumberBaseball({
   open,
   length,
   secret,
   attemptIndex1,
   onClose,
-  difficulty
 }: Props) {
   const [picked, setPicked] = useState<string[]>([]);
+  const [showWinMessage, setShowWinMessage] = useState(false);
   const canSubmit = picked.length === length;
 
 
   useEffect(() => {
-    if (!open) setPicked([]);
+    if (!open) {
+      setPicked([]);
+      setShowWinMessage(false);
+    }
   }, [open, length]);
 
   const usedSet = useMemo(() => new Set(picked), [picked]);
@@ -143,9 +160,17 @@ export default function NumberBaseball({
     const result = judgeGuess(guess, secret);
     const historyLine = formatAttemptLine(attemptIndex1, guess, result);
 
-
     const win = result.strike === length;
-    onClose({ guess, result, historyLine, win });
+    
+    if (win) {
+      setShowWinMessage(true);
+      // 1.5초 후 자동으로 닫기
+      setTimeout(() => {
+        onClose({ guess, result, historyLine, win });
+      }, 1500);
+    } else {
+      onClose({ guess, result, historyLine, win });
+    }
   };
 
   const onKeyDown = (e: KeyboardEvent) => {
@@ -212,6 +237,13 @@ export default function NumberBaseball({
           </button>
         </div>
 
+        {/* 승리 메시지 */}
+        {showWinMessage && (
+          <div style={winMessageStyle}>
+            🎉 정답입니다! ESCAPE! 🎉
+          </div>
+        )}
+
         {/* 선택 슬롯 */}
         <div style={slotsStyle}>
           {Array.from({ length }).map((_, i) => (
@@ -262,6 +294,17 @@ export default function NumberBaseball({
           </button>
         </div>
       </div>
+
+      <style>{`
+        @keyframes winPulse {
+          0%, 100% {
+            box-shadow: 0 0 20px rgba(0, 255, 0, 0.6);
+          }
+          50% {
+            box-shadow: 0 0 40px rgba(0, 255, 0, 1);
+          }
+        }
+      `}</style>
     </div>
   );
 }

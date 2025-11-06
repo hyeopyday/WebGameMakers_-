@@ -1,0 +1,73 @@
+.hp-bar-container {
+  position: absolute;
+  top: 20px;
+  left: 20px;
+  z-index: 1000;
+  pointer-events: none;
+  animation: hpFadeIn 0.5s ease-in-out;
+}
+
+@keyframes hpFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.hp-bar-image {
+  width: 200px;
+  height: auto;
+  image-rendering: pixelated;
+  image-rendering: -moz-crisp-edges;
+  image-rendering: crisp-edges;
+  filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.7));
+  transition: all 0.3s ease;
+}
+
+.hp-bar-image:hover {
+  transform: scale(1.05);
+}
+
+/* 체력이 줄어들 때 애니메이션 효과 */
+@keyframes hpHit {
+  0%, 100% {
+    transform: scale(1);
+  }
+  25% {
+    transform: scale(1.1) rotate(-5deg);
+  }
+  75% {
+    transform: scale(1.1) rotate(5deg);
+  }
+}
+
+.hp-bar-container.damaged .hp-bar-image {
+  animation: hpHit 0.5s ease;
+}
+
+/* 반응형 디자인 */
+@media (max-width: 768px) {
+  .hp-bar-container {
+    top: 15px;
+    left: 15px;
+  }
+
+  .hp-bar-image {
+    width: 150px;
+  }
+}
+
+@media (max-width: 480px) {
+  .hp-bar-container {
+    top: 10px;
+    left: 10px;
+  }
+
+  .hp-bar-image {
+    width: 120px;
+  }
+}

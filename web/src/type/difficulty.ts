@@ -1,7 +1,7 @@
 // FILE: src/type/difficulty.ts
 
 // 1=Normal, 2=Hard, 3=Hell
-export type GameMode = 1 | 2 | 3;
+import type { Mode } from "./numberBaseball";
 
 export interface DifficultySpec {
   name: "Normal" | "Hard" | "Hell";
@@ -11,7 +11,7 @@ export interface DifficultySpec {
   chaserCount: number; // 체이서 개체수
 }
 
-const TABLE: Record<GameMode, DifficultySpec> = {
+const TABLE: Record<Mode, DifficultySpec> = {
   1: {
     name: "Normal",
     playerMaxHP: 3,
@@ -29,7 +29,7 @@ const TABLE: Record<GameMode, DifficultySpec> = {
   3: {
     name: "Hell",
     playerMaxHP: 1,
-    chaserSpeed: 2.15,
+    chaserSpeed: 3,
     runnerSpeed: 2.1,
     chaserCount: 4,
   },
@@ -38,11 +38,11 @@ const TABLE: Record<GameMode, DifficultySpec> = {
 const STORAGE_KEY = "game.difficulty.mode";
 export const DIFFICULTY_CHANGED = "difficulty-changed";
 
-function readInitialMode(): GameMode {
+function readInitialMode(): Mode {
   try {
     const raw = typeof localStorage !== "undefined" ? localStorage.getItem(STORAGE_KEY) : null;
     const m = raw ? Number(raw) : 1;
-    if (m === 1 || m === 2 || m === 3) return m as GameMode;
+    if (m === 1 || m === 2 || m === 3) return m as Mode;
   } catch {}
   return 1;
 }
@@ -59,7 +59,7 @@ const state = {
   spec: TABLE[initialMode],
 };
 
-export function setDifficulty(mode: GameMode): void {
+export function setDifficulty(mode: Mode): void {
   const next = mode === 1 || mode === 2 || mode === 3 ? mode : 1;
   state.mode = next;
   state.spec = TABLE[next];
@@ -86,7 +86,7 @@ export function getDifficulty(): DifficultySpec {
   return state.spec;
 }
 
-export function getMode(): GameMode {
+export function getMode(): Mode {
   return state.mode;
 }
 
@@ -99,7 +99,7 @@ export const DIFFICULTY = new Proxy({} as DifficultySpec, {
 }) as DifficultySpec;
 
 export const ModeMap = {
-  normal: 1 as GameMode,
-  hard: 2 as GameMode,
-  hell: 3 as GameMode,
+  normal: 1 as Mode,
+  hard: 2 as Mode,
+  hell: 3 as Mode,
 };

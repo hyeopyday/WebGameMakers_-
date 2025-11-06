@@ -1,0 +1,82 @@
+name: Deploy Vite → Nginx (via ~/frontEnd)
+
+on:
+  push:
+    branches: [ "main" ]
+
+jobs:
+  deploy-vite:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install & Build (Vite)
+        run: |
+          npm ci
+          npm run build   # => dist/
+
+      - name: Prepare SSH
+        run: |
+          set -e
+
+          # 0) 기본 포트 fallback (비어있으면 22)
+          PORT="${{ secrets.RASP_PORT }}"
+          if [ -z "$PORT" ]; then PORT=22; fi
+
+          # 1) 개인키 저장 (줄바꿈 보존)
+          mkdir -p ~/.ssh
+          printf '%s\n' "${{ secrets.RASP_SSH_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+
+          # 2) known_hosts 등록 (포트 지정 + 실패해도 빌드 중단 X)
+          (ssh-keyscan -p "$PORT" -H "${{ secrets.RASP_HOST }}" 2>/dev/null >> ~/.ssh/known_hosts) || true
+
+          # 3) SSH config 작성(호스트별 설정) → 이후부터는 'ssh deploy_target'로 접속 가능
+          cat > ~/.ssh/config <<EOF
+          Host deploy_target
+              HostName ${{ secrets.RASP_HOST }}
+              User ${{ secrets.RASP_USER }}
+              Port $PORT
+              IdentityFile ~/.ssh/id_ed25519
+              IdentitiesOnly yes
+              StrictHostKeyChecking accept-new
+          EOF
+              chmod 600 ~/.ssh/config
+
+      # 1) 원격: ~/frontEnd 를 매번 초기화
+      - name: Clean ~/frontEnd on server
+        run: |
+          PORT="${{ secrets.RASP_PORT }}"
+          ssh -p "$PORT" ${{ secrets.RASP_USER }}@${{ secrets.RASP_HOST }} '
+            set -e
+            TARGET="$HOME/frontEnd"
+            rm -rf "$TARGET" && mkdir -p "$TARGET"
+          '
+
+      # 2) dist → 원격의 ~/frontEnd 로 업로드
+      - name: Upload dist → ~/frontEnd
+        run: |
+          rsync -az --delete -e "ssh -p ${{ secrets.RASP_PORT }}" ./dist/ \
+            ${{ secrets.RASP_USER }}@${{ secrets.RASP_HOST }}:~/frontEnd/
+
+      # 3) ~/frontEnd 내용을 Nginx 루트로 반영(+ 재시작)
+      - name: Deploy to Nginx root & reload
+        run: |
+          PORT="${{ secrets.RASP_PORT }}"
+          # 🔧 필요하면 여기 경로만 바꿔: /var/www/html 또는 /var/www/viteapp 등
+          NGINX_ROOT="/var/www/frontEnd"
+
+          ssh -p "$PORT" ${{ secrets.RASP_USER }}@${{ secrets.RASP_HOST }} "
+            set -e
+            sudo mkdir -p \"$NGINX_ROOT\"
+            sudo rsync -a --delete \"\$HOME/frontEnd/\" \"$NGINX_ROOT/\"
+            sudo systemctl reload nginx || sudo systemctl restart nginx
+          "

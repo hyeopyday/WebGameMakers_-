@@ -301,6 +301,7 @@ const Runner = ({ grid, paused }: RunnerProps) => {
         }
         raf = requestAnimationFrame(loop);
         return;
+        return;
       }
 
       state.pathTimer += dt;
@@ -320,6 +321,7 @@ const Runner = ({ grid, paused }: RunnerProps) => {
         state.mode = "escape";
         state.pathTimer = PATH_RECALC_TIME;
       }
+
 
       const pcx = Math.floor(state.targetX / CELL_SIZE);
       const pcy = Math.floor(state.targetY / CELL_SIZE);
@@ -423,6 +425,7 @@ const Runner = ({ grid, paused }: RunnerProps) => {
       cancelAnimationFrame(raf);
       window.removeEventListener("player-pos", onPlayerPos as EventListener);
       window.removeEventListener("reposition-mobs", onRepositionMobs as EventListener);
+      window.removeEventListener("reposition-mobs", onRepositionMobs as EventListener);
     };
   }, [grid, paused, difficultyVersion]); // ✅ difficultyVersion 의존성 추가
 
@@ -445,5 +448,6 @@ const Runner = ({ grid, paused }: RunnerProps) => {
     />
   );
 };
+
 
 export default Runner;

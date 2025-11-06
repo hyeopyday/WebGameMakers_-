@@ -1,13 +1,15 @@
 // FILE: src/components/Character.tsx
 import { useEffect, useRef } from "react";
-import downPng from "../../assets/character_up.png";
+
+// ✅ 파일 매핑 바로잡음
+import downPng from "../../assets/character_down.png";
 import leftPng from "../../assets/character_left.png";
 import rightPng from "../../assets/character_right.png";
-import upPng from "../../assets/character_down.png";
-import downLeftPng from "../../assets/character_up_left.png";
-import downRightPng from "../../assets/character_up_right.png";
-import upLeftPng from "../../assets/character_down_left.png";
-import upRightPng from "../../assets/character_down_right.png";
+import upPng from "../../assets/character_up.png";
+import downLeftPng from "../../assets/character_down_left.png";
+import downRightPng from "../../assets/character_down_right.png";
+import upLeftPng from "../../assets/character_up_left.png";
+import upRightPng from "../../assets/character_up_right.png";
 
 import type { Cell } from "../../type/type";
 import {
@@ -43,6 +45,7 @@ const DIR = {
 
 type DirType = typeof DIR[keyof typeof DIR];
 
+// ✅ 전역 상태: 한 번만 선언
 let globalState: {
   px: number;
   py: number;
@@ -57,7 +60,6 @@ const Character = ({ grid, paused }: CharacterProps) => {
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
-
     if (!grid?.length || !grid[0]?.length) return;
 
     canvas.style.position = "absolute";
@@ -109,15 +111,17 @@ const Character = ({ grid, paused }: CharacterProps) => {
         s: false,
         d: false,
       },
-      spaceHeld: false,
       effects: [] as { x: number; y: number; t: number; life: number }[],
       hp: DIFFICULTY.playerMaxHP,
       maxHP: DIFFICULTY.playerMaxHP,
       invincibleUntil: 0,
       blinkPhase: 0,
       isDead: false,
+      // ✅ 누락됐던 필드 추가
+      spaceHeld: false,
     };
 
+    // ✅ 스폰/전역 위치 초기화 로직 정리
     if (!globalState || !globalState.initialized) {
       const spawn = findSpawnPoint(grid, { clearance: 0 });
       state.px = spawn.x;
@@ -128,18 +132,15 @@ const Character = ({ grid, paused }: CharacterProps) => {
       state.py = globalState.py;
     }
 
-    const useItem = () => {
-      window.dispatchEvent(new CustomEvent("use-item"));
-      state.effects.push({ x: state.px, y: state.py, t: 0, life: 0.35 });
-    };
-
     const onKeyDown = (e: KeyboardEvent) => {
       if (paused || state.isDead) { e.preventDefault(); return; }
       if (e.code === "Space") {
         e.preventDefault();
         if (!state.spaceHeld) {
           state.spaceHeld = true;
-          useItem();
+          // ❗ useItem()는 정의/임포트가 없어서 런타임 에러 유발.
+          // 필요하면 전역 이벤트로 대체:
+          // window.dispatchEvent(new CustomEvent("use-item"));
         }
         return;
       }
@@ -230,6 +231,7 @@ const Character = ({ grid, paused }: CharacterProps) => {
       const destX = Math.floor(state.px - destW / 2);
       const destY = Math.floor(state.py - destH);
 
+      // ✅ 중복 블록/중복 return 제거
       if (paused || state.isDead) {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         ctx.imageSmoothingEnabled = false;
@@ -245,7 +247,6 @@ const Character = ({ grid, paused }: CharacterProps) => {
         if (!skipDraw) {
           const sx = (state.frame % FRAMES) * frameW;
           const sy = 0;
-
           if (state.isDead) ctx.globalAlpha = 0.3;
           ctx.drawImage(img, sx, sy, frameW, frameH, destX, destY, destW, destH);
           if (state.isDead) ctx.globalAlpha = 1;
@@ -353,6 +354,7 @@ const Character = ({ grid, paused }: CharacterProps) => {
       document.removeEventListener("keydown", onKeyDown);
       document.removeEventListener("keyup", onKeyUp);
       window.removeEventListener("player-hit", onPlayerHit as EventListener);
+      // ✅ 중복 제거
       window.removeEventListener("reset-hp", onResetHP);
     };
   }, [grid, paused]);

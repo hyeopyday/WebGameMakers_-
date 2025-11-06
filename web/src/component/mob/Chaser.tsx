@@ -215,7 +215,9 @@ const Chaser = ({ grid, paused }: ChaserProps) => {
 
         raf = requestAnimationFrame(loop);
         return;
+        return;
       }
+
 
       state.pathTimer += dt;
       if (state.attackCD > 0) state.attackCD = Math.max(0, state.attackCD - dt);
