@@ -12,10 +12,5 @@ export default defineConfig({
   server: {
     host: true,
     port: 5173,
-    hmr: {
-      clientPort: 80,                // 프록시가 https(443)일 경우
-      protocol: 'ws',                // HTTPS면 wss, HTTP면 ws
-      host: 'runtoyou.duckdns.org',   // 실제 접근할 도메인
-    },
   },
 })

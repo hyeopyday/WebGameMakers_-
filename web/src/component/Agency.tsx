@@ -1,3 +1,4 @@
+// Agency.tsx
 import { useEffect, useState } from "react";
 import NumberBaseball from "./NumberBaseball/NumberBaseball";
 import PauseUI from "./PauseUI/PauseUI";
@@ -11,7 +12,7 @@ import { type Cell, MAP_WIDTH, MAP_HEIGHT } from "../type/type";
 import Map from "./Map/Map";
 import { type Mode } from "../type/numberBaseball";
 import "./Agency.css";
-// ... Map import 등
+
 interface AgencyProps {
     difficulty: Mode;
     onMainMenu: () => void;
@@ -29,6 +30,18 @@ function Agency({ difficulty, onMainMenu }: AgencyProps) {
   const [history, setHistory] = useState<string[]>([]);
 
   const [grid, setGrid] = useState<Cell[][]>([]);
+
+  // M 키로 게임 승리 테스트
+  useEffect(() => {
+    const handleKeyPress = (e: KeyboardEvent) => {
+      if (e.key === 'm' || e.key === 'M') {
+        window.dispatchEvent(new CustomEvent("game-win"));
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyPress);
+    return () => window.removeEventListener("keydown", handleKeyPress);
+  }, []);
 
   // 게임 일시정지 이벤트 리스너
   useEffect(() => {
@@ -52,15 +65,6 @@ function Agency({ difficulty, onMainMenu }: AgencyProps) {
     };
     window.addEventListener("enemyA-collide", onCollide as EventListener);
     return () => window.removeEventListener("enemyA-collide", onCollide as EventListener);
-  }, []);
-
-  // 플레이어 사망 이벤트 리스너
-  useEffect(() => {
-    const onPlayerDead = () => {
-      setPaused(true);
-    };
-    window.addEventListener("player-dead", onPlayerDead);
-    return () => window.removeEventListener("player-dead", onPlayerDead);
   }, []);
 
   // 게임 승리 이벤트 리스너
@@ -144,15 +148,6 @@ function Agency({ difficulty, onMainMenu }: AgencyProps) {
     setHistory([]);
   };
 
-  const handleVictoryContinue = () => {
-    // 승리 후 계속하기 - 새로운 숫자 생성
-    setPaused(false);
-    setAttemptCount(0);
-    setHistory([]);
-    setSecret(generateSecret(length));
-    console.log("새로운 게임 시작!");
-  };
-
   return (
     <div id="Agency">
         <div className="hp-bar">
@@ -200,7 +195,7 @@ function Agency({ difficulty, onMainMenu }: AgencyProps) {
       <GameOver onRestart={handleRestart} onMainMenu={onMainMenu} />
 
       {/* Game Victory Screen */}
-      <GameVictory onContinue={handleVictoryContinue} onMainMenu={onMainMenu} />
+      <GameVictory onMainMenu={onMainMenu} />
     </div>
   );
 }

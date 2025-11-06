@@ -1,6 +1,9 @@
-// FILE: src/component/UI/GameOver.tsx
+// GameOver.tsx
 import { useEffect, useState } from "react";
 import "./GameOver.css";
+import gameoverImg from "../../assets/gameover/gameover.png";
+import restartBtn from "../../assets/gameover/다시하기.png";
+import mainMenuBtn from "../../assets/gameover/메인으로.png";
 
 interface GameOverProps {
   onRestart: () => void;
@@ -39,27 +42,26 @@ const GameOver = ({ onRestart, onMainMenu }: GameOverProps) => {
   return (
     <div className="gameover-overlay">
       <div className="gameover-container">
-        <div className="gameover-content">
-          <h1 className="gameover-title">게임 오버</h1>
-          <p className="gameover-subtitle">당신은 패배했습니다</p>
+        <img 
+          src={gameoverImg} 
+          alt="Game Over" 
+          className="gameover-title-image"
+        />
 
-          <div className="gameover-buttons">
-            <button
-              className="gameover-button restart-btn"
-              onClick={handleRestart}
-            >
-              <span className="button-icon">🔄</span>
-              <span className="button-text">재도전</span>
-            </button>
+        <div className="gameover-buttons">
+          <button
+            className="gameover-button restart-btn"
+            onClick={handleRestart}
+          >
+            <img src={restartBtn} alt="다시하기" />
+          </button>
 
-            <button
-              className="gameover-button menu-btn"
-              onClick={handleMainMenu}
-            >
-              <span className="button-icon">🏠</span>
-              <span className="button-text">메인 메뉴</span>
-            </button>
-          </div>
+          <button
+            className="gameover-button mainmenu-btn"
+            onClick={handleMainMenu}
+          >
+            <img src={mainMenuBtn} alt="메인으로" />
+          </button>
         </div>
       </div>
     </div>

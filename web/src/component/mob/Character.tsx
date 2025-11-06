@@ -169,23 +169,18 @@ const Character = ({ grid, paused }: CharacterProps) => {
     document.addEventListener("keyup", onKeyUp);
 
     const onPlayerHit = (e: Event) => {
-      const ce = e as CustomEvent<{ dmg?: number }>;
-      if (state.hp <= 0 || state.isDead) return;
-      const now = performance.now();
-      if (now < state.invincibleUntil) return;
-      
-      const dmg = Math.max(1, Math.floor(ce.detail?.dmg ?? 1));
-      state.hp = Math.max(0, state.hp - dmg);
-      state.invincibleUntil = now + 1000; // 1초 무적
-      
-      console.log(`[HP] ${state.hp}/${state.maxHP}`);
-      
-      if (state.hp === 0) {
-        state.isDead = true;
-        window.dispatchEvent(new CustomEvent("player-dead"));
-        console.log("플레이어 사망!");
-      }
-    };
+  const ce = e as CustomEvent<{ dmg?: number }>;
+  if (state.hp <= 0 || state.isDead) return;
+  const now = performance.now();
+  if (now < state.invincibleUntil) return;
+  
+  const dmg = Math.max(1, Math.floor(ce.detail?.dmg ?? 1));
+  state.hp = Math.max(0, state.hp - dmg);
+  state.invincibleUntil = now + 1000; // 1초 무적
+  
+  console.log(`[HP] ${state.hp}/${state.maxHP}`);
+  
+};
     window.addEventListener("player-hit", onPlayerHit as EventListener);
 
     // HP 리셋 이벤트
