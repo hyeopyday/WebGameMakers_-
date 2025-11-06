@@ -45,8 +45,9 @@ S 아이템 (Strike)
 * 난이도 별 몹 수 수정
 
 * 효과음 넣기
-<https://www.sellbuymusic.com/search/soundeffect>
-<https://pixabay.com/ko/sound-effects/>
+  - <https://www.sellbuymusic.com/search/soundeffect>
+  
+  - <https://pixabay.com/ko/sound-effects/>
 
 * PPT 만들기
   
