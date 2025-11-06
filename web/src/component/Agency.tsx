@@ -1,5 +1,5 @@
-// Agency.tsx
 import { useEffect, useState } from "react";
+import { audioManager } from "../utils/audioManager";
 import NumberBaseball from "./NumberBaseball/NumberBaseball";
 import PauseUI from "./PauseUI/PauseUI";
 import SettingsUI from "./SettingsUI/SettingsUI";
@@ -32,6 +32,16 @@ function Agency({ difficulty, onMainMenu }: AgencyProps) {
 
   const [grid, setGrid] = useState<Cell[][]>([]);
 
+  useEffect(() => {
+    audioManager.stopBGM(true);
+    setTimeout(() => {
+      audioManager.playBGM("/sounds/playing_game.mp3", true);
+    }, 500);
+
+    return () => {
+      audioManager.stopBGM(false);
+    };
+  }, []);
 
   useEffect(() => {
     try {
@@ -43,7 +53,6 @@ function Agency({ difficulty, onMainMenu }: AgencyProps) {
       console.warn("localStorage 접근 실패:", err);
     }
   }, [difficulty]);
-
 
   useEffect(() => {
     const handleKeyPress = (e: KeyboardEvent) => {
@@ -57,8 +66,14 @@ function Agency({ difficulty, onMainMenu }: AgencyProps) {
   }, []);
 
   useEffect(() => {
-    const onGamePaused = () => setPaused(true);
-    const onGameResumed = () => setPaused(false);
+    const onGamePaused = () => {
+      setPaused(true);
+      audioManager.pauseBGM();
+    };
+    const onGameResumed = () => {
+      setPaused(false);
+      audioManager.resumeBGM();
+    };
 
     window.addEventListener("game-paused", onGamePaused);
     window.addEventListener("game-resumed", onGameResumed);
@@ -81,6 +96,7 @@ function Agency({ difficulty, onMainMenu }: AgencyProps) {
   useEffect(() => {
     const onGameWin = () => {
       setPaused(true);
+      audioManager.stopBGM(true);
     };
     window.addEventListener("game-win", onGameWin);
     return () => window.removeEventListener("game-win", onGameWin);
@@ -150,6 +166,15 @@ function Agency({ difficulty, onMainMenu }: AgencyProps) {
     setPaused(false);
     setAttemptCount(0);
     setHistory([]);
+    audioManager.playBGM("/sounds/playing_game.mp3", true);
+  };
+
+  const handleMainMenuFromAgency = () => {
+    audioManager.stopBGM(true);
+    setTimeout(() => {
+      audioManager.playBGM("/sounds/main.mp3", true);
+    }, 500);
+    onMainMenu();
   };
 
   return (
@@ -186,15 +211,15 @@ function Agency({ difficulty, onMainMenu }: AgencyProps) {
 
       <PauseUI
         onResume={handleResume}
-        onMainMenu={onMainMenu}
+        onMainMenu={handleMainMenuFromAgency}
         onSettings={handleSettings}
       />
 
       <SettingsUI isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} />
 
-      <GameOver onRestart={handleRestart} onMainMenu={onMainMenu} />
+      <GameOver onRestart={handleRestart} onMainMenu={handleMainMenuFromAgency} />
 
-      <GameVictory onMainMenu={onMainMenu} />
+      <GameVictory onMainMenu={handleMainMenuFromAgency} />
     </div>
   );
 }

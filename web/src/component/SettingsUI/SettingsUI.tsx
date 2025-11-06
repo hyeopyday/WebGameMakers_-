@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { audioManager } from "../../utils/audioManager";
 import "./SettingsUI.css";
 
 interface SettingsUIProps {
@@ -12,20 +13,59 @@ const SettingsUI = ({ isOpen, onClose }: SettingsUIProps) => {
   const [pixelPerfect, setPixelPerfect] = useState(true);
   const [showFPS, setShowFPS] = useState(false);
 
+  useEffect(() => {
+    if (isOpen) {
+      setVolume(audioManager.getSFXVolume());
+      setMusicVolume(audioManager.getBGMVolume());
+    }
+  }, [isOpen]);
+
   if (!isOpen) return null;
 
+  const handleVolumeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = Number(e.target.value);
+    setVolume(value);
+    audioManager.setSFXVolume(value);
+  };
+
+  const handleMusicVolumeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = Number(e.target.value);
+    setMusicVolume(value);
+    audioManager.setBGMVolume(value);
+  };
+
+  const handlePixelPerfectToggle = (e: React.ChangeEvent<HTMLInputElement>) => {
+    audioManager.playSFX("/sounds/click.mp3");
+    setPixelPerfect(e.target.checked);
+  };
+
+  const handleShowFPSToggle = (e: React.ChangeEvent<HTMLInputElement>) => {
+    audioManager.playSFX("/sounds/click.mp3");
+    setShowFPS(e.target.checked);
+  };
+
   const handleApply = () => {
-    // 설정 저장 로직
+    audioManager.playSFX("/sounds/click.mp3");
     console.log("설정 적용:", { volume, musicVolume, pixelPerfect, showFPS });
     onClose();
   };
 
+  const handleClose = () => {
+    audioManager.playSFX("/sounds/click.mp3");
+    onClose();
+  };
+
+  const handleCancel = () => {
+    audioManager.playSFX("/sounds/click.mp3");
+    onClose();
+  };
+
   return (
-    <div className="settings-overlay" onClick={onClose}>
+    <div className="settings-overlay" onClick={handleClose}>
       <div className="settings-container" onClick={(e) => e.stopPropagation()}>
         <div className="settings-header">
           <h2>⚙️ 설정</h2>
-          <button className="settings-close-btn" onClick={onClose} aria-label="닫기">
+          <button className="settings-close-btn" onClick={handleClose} aria-label="닫기">
             ×
           </button>
         </div>
@@ -43,7 +83,7 @@ const SettingsUI = ({ isOpen, onClose }: SettingsUIProps) => {
                   min="0"
                   max="100"
                   value={volume}
-                  onChange={(e) => setVolume(Number(e.target.value))}
+                  onChange={handleVolumeChange}
                 />
                 <span className="volume-display">{volume}%</span>
               </div>
@@ -58,7 +98,7 @@ const SettingsUI = ({ isOpen, onClose }: SettingsUIProps) => {
                   min="0"
                   max="100"
                   value={musicVolume}
-                  onChange={(e) => setMusicVolume(Number(e.target.value))}
+                  onChange={handleMusicVolumeChange}
                 />
                 <span className="volume-display">{musicVolume}%</span>
               </div>
@@ -75,7 +115,7 @@ const SettingsUI = ({ isOpen, onClose }: SettingsUIProps) => {
                   id="pixel-perfect"
                   type="checkbox"
                   checked={pixelPerfect}
-                  onChange={(e) => setPixelPerfect(e.target.checked)}
+                  onChange={handlePixelPerfectToggle}
                 />
                 <span className="toggle-slider"></span>
               </div>
@@ -88,7 +128,7 @@ const SettingsUI = ({ isOpen, onClose }: SettingsUIProps) => {
                   id="show-fps"
                   type="checkbox"
                   checked={showFPS}
-                  onChange={(e) => setShowFPS(e.target.checked)}
+                  onChange={handleShowFPSToggle}
                 />
                 <span className="toggle-slider"></span>
               </div>
@@ -97,7 +137,7 @@ const SettingsUI = ({ isOpen, onClose }: SettingsUIProps) => {
         </div>
 
         <div className="settings-footer">
-          <button className="settings-cancel-btn" onClick={onClose}>
+          <button className="settings-cancel-btn" onClick={handleCancel}>
             취소
           </button>
           <button className="settings-apply-btn" onClick={handleApply}>
