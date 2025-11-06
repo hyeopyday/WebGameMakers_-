@@ -11,7 +11,7 @@ import {
 } from "../../type/type";
 import { moveWithWorldCollision } from "./Physic/Physic";
 // 좌/우 이동용 4프레임 스프라이트 시트
-import mimicLeft from "../../assets/Runner.png";
+import mimicLeft from "../../assets/Runner2.png";
 import mimicRight from "../../assets/Runner.png";
 import { DIFFICULTY, DIFFICULTY_CHANGED } from "../../type/difficulty";
 
@@ -30,9 +30,9 @@ const PANIC_RECALC_DIST = SAFE_INNER;
 const PLAYER_PIXEL_TRIGGER = 24;
 
 // ▼ 4프레임 시트. 프레임 크기는 이미지 로드 후 계산.
-const FRAMES = 4;
+const FRAMES = 6;
 const SPRITE_SCALE = 2;
-const ANIM_FPS = 8;
+const ANIM_FPS = 10;
 const COLLIDE_RADIUS = 20;
 const COLLIDE_COOLDOWN = 0.8;
 
