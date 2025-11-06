@@ -1,3 +1,4 @@
+// FILE: src/component/Map/Map.tsx
 import { useEffect, useRef } from "react";
 import type { Cell } from "../../type/type";
 import { FLOOR, WALL } from "../../type/type";
@@ -7,9 +8,7 @@ import Character from "../../component/mob/Character";
 import Runner from "../../component/mob/Runner";
 import Vision from "../../component/Map/Vision";
 import ArrowOverlay from "../../component/Map/ArrowOverlay";
-
-
-
+import { DIFFICULTY } from "../../type/difficulty";
 
 import "./Map.css";
 
@@ -97,7 +96,6 @@ const Map = ({ grid, paused }: MapProps) => {
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    // grid 준비 전엔 아무것도 하지 않음
     if (!grid?.length || !grid[0]?.length) return;
 
     canvas.width = MAP_WIDTH * TILE_SIZE * SCALE;
@@ -112,21 +110,16 @@ const Map = ({ grid, paused }: MapProps) => {
       drawTiles(grid, ctx, img);
     };
 
-    // 이미지 1회 초기화 & 재사용
     if (!imgRef.current) {
       const img = new Image();
       img.decoding = "async";
-      // 핸들러 먼저 등록
       img.onload = () => draw();
       img.onerror = (e) => {
         console.error("tileset load error", e);
       };
       imgRef.current = img;
-      // src 나중에 세팅
       img.src = tileset;
-      // 캐시 히트 보정
       if (img.complete && img.naturalWidth > 0) {
-        // onload가 이미 지나갔을 수 있으니 직접 그리기
         requestAnimationFrame(draw);
       }
     } else {
@@ -134,7 +127,6 @@ const Map = ({ grid, paused }: MapProps) => {
       if (img.complete && img.naturalWidth > 0) {
         requestAnimationFrame(draw);
       } else {
-        // 아직 로딩 중이면 onload에서 그려짐
         img.onload = () => draw();
       }
     }
@@ -153,11 +145,12 @@ const Map = ({ grid, paused }: MapProps) => {
         height={MAP_HEIGHT * TILE_SIZE * SCALE}
       />
       <Character grid={grid} paused={paused} />
-      <Chaser grid={grid} paused={paused} />
+      {Array.from({ length: DIFFICULTY.chaserCount }).map((_, i) => (
+        <Chaser key={`chaser-${i}`} id={i} grid={grid} paused={paused} />
+      ))}
       <Runner grid={grid} paused={paused} />
       <ArrowOverlay minDist={120} maxDist={1200} size={28} ring={36} />
       <Vision radius={200} feather={90} />
-
     </div>
   );
 };

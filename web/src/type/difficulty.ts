@@ -31,14 +31,14 @@ const TABLE: Record<Mode, DifficultySpec> = {
     playerMaxHP: 3,
     chaserSpeed: 5.7,
     runnerSpeed: 3.3,
-    chaserCount: 1,
+    chaserCount: 2,
   },
   3: {
     name: "Hell",
     playerMaxHP: 2,
-    chaserSpeed: 7.2,
-    runnerSpeed: 8.6,
-    chaserCount: 2,
+    chaserSpeed: 6.2,
+    runnerSpeed: 6.6,
+    chaserCount: 4,
   },
 };
 

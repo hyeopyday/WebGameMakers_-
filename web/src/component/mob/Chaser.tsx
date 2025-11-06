@@ -16,6 +16,8 @@ import { DIFFICULTY, DIFFICULTY_CHANGED } from "../../type/difficulty";
 interface ChaserProps {
   grid: Cell[][]; 
   paused?: boolean;
+  // ✅ 여러 개체 지원을 위한 식별자(기본 0). 기존 호출부 호환.
+  id?: number;
 }
 
 const PATH_RECALC_TIME = 0.3;
@@ -29,11 +31,12 @@ const ANIM_FPS = 8;
 const CELL_SIZE = TILE_SIZE * SCALE;
 const ATTACK_COOLDOWN = 0.9;
 
-let globalChaserState: {
+// ✅ 단일 전역 → 다중 개체 전역 상태 맵
+const globalChaserState: Record<number, {
   px: number;
   py: number;
   initialized: boolean;
-} | null = null;
+}> = {};
 
 function findPath(
   grid: Cell[][],
@@ -93,9 +96,9 @@ function findPath(
   return [];
 }
 
-const Chaser = ({ grid, paused }: ChaserProps) => {
+const Chaser = ({ grid, paused, id = 0 }: ChaserProps) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  // ✅ 난이도 속도를 ref로 관리 - loop에서 항상 최신 값 참조
+  // ✅ 난이도 속도를 ref로 유지
   const speedRef = useRef(DIFFICULTY.chaserSpeed);
 
   useEffect(() => {
@@ -122,7 +125,7 @@ const Chaser = ({ grid, paused }: ChaserProps) => {
 
     // ✅ 초기 속도 설정
     speedRef.current = DIFFICULTY.chaserSpeed;
-    console.log(`[Chaser] 시작 - 난이도: ${DIFFICULTY.name}, 속도: ${speedRef.current} 타일/초`);
+    console.log(`[Chaser ${id}] 시작 - 난이도: ${DIFFICULTY.name}, 속도: ${speedRef.current} 타일/초`);
 
     const state = {
       px: 0,
@@ -141,14 +144,15 @@ const Chaser = ({ grid, paused }: ChaserProps) => {
       lastTime: 0,
     };
 
-    if (!globalChaserState || !globalChaserState.initialized) {
+    // ✅ 개체별 전역 상태 초기화/복원
+    if (!globalChaserState[id] || !globalChaserState[id].initialized) {
       const s = findSpawnPoint(grid, { clearance: 0 });
       state.px = s.x;
       state.py = s.y;
-      globalChaserState = { px: s.x, py: s.y, initialized: true };
+      globalChaserState[id] = { px: s.x, py: s.y, initialized: true };
     } else {
-      state.px = globalChaserState.px;
-      state.py = globalChaserState.py;
+      state.px = globalChaserState[id].px;
+      state.py = globalChaserState[id].py;
     }
 
     const onPlayerPos = (e: Event) => {
@@ -163,22 +167,20 @@ const Chaser = ({ grid, paused }: ChaserProps) => {
       const newSpawn = findSpawnPoint(grid, { clearance: 0 });
       state.px = newSpawn.x;
       state.py = newSpawn.y;
-      if (globalChaserState) {
-        globalChaserState.px = state.px;
-        globalChaserState.py = state.py;
-      }
+      // ✅ 개체별 좌표 저장
+      globalChaserState[id] = { px: state.px, py: state.py, initialized: true };
       state.path = [];
       state.mode = "idle";
       state.attackCD = 0;
       state.attackFreeze = 0;
-      console.log(`Chaser repositioned to random location: (${Math.floor(state.px)}, ${Math.floor(state.py)})`);
+      console.log(`Chaser ${id} repositioned to random location: (${Math.floor(state.px)}, ${Math.floor(state.py)})`);
     };
     window.addEventListener("reposition-mobs", onRepositionMobs as EventListener);
 
     // ✅ 난이도 변경 이벤트 리스너
     const onDifficultyChange = () => {
       speedRef.current = DIFFICULTY.chaserSpeed;
-      console.log(`[Chaser] 난이도 변경! 새 속도: ${speedRef.current} 타일/초 (${DIFFICULTY.name})`);
+      console.log(`[Chaser ${id}] 난이도 변경! 새 속도: ${speedRef.current} 타일/초 (${DIFFICULTY.name})`);
     };
     window.addEventListener(DIFFICULTY_CHANGED, onDifficultyChange);
 
@@ -214,10 +216,8 @@ const Chaser = ({ grid, paused }: ChaserProps) => {
         );
 
         raf = requestAnimationFrame(loop);
-        return;
-        return;
+        return; // ✅ 중복 return 제거
       }
-
 
       state.pathTimer += dt;
       if (state.attackCD > 0) state.attackCD = Math.max(0, state.attackCD - dt);
@@ -278,10 +278,9 @@ const Chaser = ({ grid, paused }: ChaserProps) => {
           state.px = moved.x;
           state.py = moved.y;
 
-          if (globalChaserState) {
-            globalChaserState.px = state.px;
-            globalChaserState.py = state.py;
-          }
+          // ✅ 개체별 좌표 저장
+          globalChaserState[id].px = state.px;
+          globalChaserState[id].py = state.py;
         }
       }
 
@@ -325,7 +324,7 @@ const Chaser = ({ grid, paused }: ChaserProps) => {
       window.removeEventListener("reposition-mobs", onRepositionMobs as EventListener);
       window.removeEventListener(DIFFICULTY_CHANGED, onDifficultyChange);
     };
-  }, [grid, paused]);
+  }, [grid, paused, id]);
 
   return (
     <canvas
