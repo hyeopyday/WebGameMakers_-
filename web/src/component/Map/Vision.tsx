@@ -1,14 +1,35 @@
-// FILE: src/overlay/Vision.tsx
-import { useEffect, useRef } from "react";
+// src/component/Map/Vision.tsx
+import { useEffect, useRef, useState } from "react";
 import { MAP_WIDTH, MAP_HEIGHT, TILE_SIZE, SCALE } from "../../type/type";
 
 interface VisionProps {
-  radius?: number;   // 밝게 보이는 반경(px)
-  feather?: number;  // 경계 페더(px)
+  radius?: number;
+  feather?: number;
 }
 
 const Vision = ({ radius = 200, feather = 90 }: VisionProps) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+
+  // 🔹 버프 반영 가능한 상태
+  const [rad, setRad] = useState(radius);
+  const [until, setUntil] = useState(0);
+
+  useEffect(() => {
+    const onVis = (e: Event) => {
+      const ce = e as CustomEvent<{ radius?: number; duration?: number }>;
+      const addR = ce.detail?.radius ?? 320;
+      const dur = ce.detail?.duration ?? 6000;
+      setRad(addR);
+      setUntil(performance.now() + dur);
+      setTimeout(() => {
+        // 타임아웃 후 자동 복귀(안전장치)
+        setRad(radius);
+        setUntil(0);
+      }, dur + 20);
+    };
+    window.addEventListener("item-visibility", onVis as EventListener);
+    return () => window.removeEventListener("item-visibility", onVis as EventListener);
+  }, [radius]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -27,14 +48,10 @@ const Vision = ({ radius = 200, feather = 90 }: VisionProps) => {
     canvas.style.pointerEvents = "none";
     // @ts-ignore
     canvas.style.imageRendering = "pixelated";
-    canvas.style.zIndex = "9";       // 캐릭터/적 위, HUD 아래(필요시 조정)
+    canvas.style.zIndex = "9";
     canvas.style.backgroundColor = "transparent";
 
-    const state = {
-      x: W * 0.5,
-      y: H * 0.5,
-      lastTime: 0,
-    };
+    const state = { x: W * 0.5, y: H * 0.5, lastTime: 0 };
 
     const onPlayerPos = (e: Event) => {
       const ce = e as CustomEvent<{ x: number; y: number }>;
@@ -48,16 +65,20 @@ const Vision = ({ radius = 200, feather = 90 }: VisionProps) => {
       if (!state.lastTime) state.lastTime = t;
       state.lastTime = t;
 
-      // 전체 어둡게
+      // 버프 시간 지났으면 원복
+      if (until && performance.now() > until) {
+        setRad(radius);
+        setUntil(0);
+      }
+
       ctx.globalCompositeOperation = "source-over";
       ctx.clearRect(0, 0, W, H);
       ctx.fillStyle = "black";
       ctx.fillRect(0, 0, W, H);
 
-      // 플레이어 주변만 보이게 구멍
       ctx.globalCompositeOperation = "destination-out";
-      const r0 = Math.max(0, radius - feather);
-      const r1 = radius;
+      const r0 = Math.max(0, rad - feather);
+      const r1 = rad;
       const g = ctx.createRadialGradient(state.x, state.y, r0, state.x, state.y, r1);
       g.addColorStop(0, "rgba(0,0,0,1)");
       g.addColorStop(1, "rgba(0,0,0,0)");
@@ -66,7 +87,6 @@ const Vision = ({ radius = 200, feather = 90 }: VisionProps) => {
       ctx.arc(state.x, state.y, r1, 0, Math.PI * 2);
       ctx.fill();
 
-      // 다음 프레임
       raf = requestAnimationFrame(loop);
     };
 
@@ -75,7 +95,7 @@ const Vision = ({ radius = 200, feather = 90 }: VisionProps) => {
       cancelAnimationFrame(raf);
       window.removeEventListener("player-pos", onPlayerPos as EventListener);
     };
-  }, []);
+  }, [rad, feather]);
 
   return (
     <canvas

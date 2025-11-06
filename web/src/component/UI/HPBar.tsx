@@ -1,4 +1,4 @@
-// HPBar.tsx
+// src/component/UI/HPBar.tsx
 import { useEffect, useState } from "react";
 import fullHP from "../../assets/FullHP.png";
 import oneAttackHP from "../../assets/1AttackHP.png";
@@ -14,59 +14,52 @@ const HPBar = () => {
     const handlePlayerHit = () => {
       setCurrentHP((prev) => {
         const newHP = Math.max(0, prev - 1);
-        
-        // HP가 0이 되면 게임 오버 이벤트 발생
         if (newHP === 0) {
           setTimeout(() => {
             window.dispatchEvent(new CustomEvent("player-dead"));
-          }, 100); // 약간의 딜레이 후 게임 오버
+          }, 100);
         }
-        
         return newHP;
       });
-
-      // 데미지 애니메이션
       setIsDamaged(true);
       setTimeout(() => setIsDamaged(false), 500);
     };
 
-    // 게임 재시작 또는 리셋 시 HP 초기화
     const handleResetHP = () => {
       setCurrentHP(3);
       setIsDamaged(false);
     };
 
+    const handleHeal = (e: Event) => {
+      const ce = e as CustomEvent<{ heal?: number }>;
+      const heal = Math.max(1, Math.floor(ce.detail?.heal ?? 1));
+      setCurrentHP((prev) => Math.min(3, prev + heal));
+    };
+
     window.addEventListener("player-hit", handlePlayerHit);
     window.addEventListener("reset-hp", handleResetHP);
+    window.addEventListener("player-heal", handleHeal as EventListener);
 
     return () => {
       window.removeEventListener("player-hit", handlePlayerHit);
       window.removeEventListener("reset-hp", handleResetHP);
+      window.removeEventListener("player-heal", handleHeal as EventListener);
     };
   }, []);
 
   const getHPImage = () => {
     switch (currentHP) {
-      case 3:
-        return fullHP;
-      case 2:
-        return oneAttackHP;
-      case 1:
-        return twoAttackHP;
-      case 0:
-        return threeAttackHP;
-      default:
-        return fullHP;
+      case 3: return fullHP;
+      case 2: return oneAttackHP;
+      case 1: return twoAttackHP;
+      case 0: return threeAttackHP;
+      default: return fullHP;
     }
   };
 
   return (
     <div className={`hp-bar-container ${isDamaged ? "damaged" : ""}`}>
-      <img 
-        src={getHPImage()} 
-        alt={`HP: ${currentHP}/3`} 
-        className="hp-bar-image"
-      />
+      <img src={getHPImage()} alt={`HP: ${currentHP}/3`} className="hp-bar-image" />
     </div>
   );
 };
