@@ -66,7 +66,6 @@ const Character = ({ grid, paused }: CharacterProps) => {
     // @ts-ignore
     canvas.style.imageRendering = "pixelated";
     canvas.style.backgroundColor = "transparent";
-    canvas.style.zIndex = "30";
 
 
     const WORLD_W = MAP_WIDTH * TILE_SIZE * SCALE;

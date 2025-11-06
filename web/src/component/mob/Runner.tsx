@@ -167,7 +167,6 @@ const Runner = ({ grid, paused }: RunnerProps) => {
     // @ts-ignore
     canvas.style.imageRendering = "pixelated";
     canvas.style.backgroundColor = "transparent";
-    canvas.style.zIndex = "30";
 
     // 좌/우 시트 로드
     const imgLeft = new Image();

@@ -115,7 +115,6 @@ const Chaser = ({ grid, paused }: ChaserProps) => {
     // @ts-ignore
     canvas.style.imageRendering = "pixelated";
     canvas.style.backgroundColor = "transparent";
-    canvas.style.zIndex = "30";
 
     const enemyImg = new Image();
     enemyImg.src = enemyPng;

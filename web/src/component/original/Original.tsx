@@ -41,6 +41,7 @@ const Original: React.FC = () => {
 
   const resetGame = useCallback(
     (keepMode = true) => {
+      void keepMode;
       const s = generateSecret(digits);
       setSecret(s);
       setStarted(true);
