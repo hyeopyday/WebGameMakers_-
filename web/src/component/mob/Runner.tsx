@@ -10,7 +10,9 @@ import {
   WALL,
 } from "../../type/type";
 import { moveWithWorldCollision } from "./Physic/Physic";
-import runnerPng from "../../assets/Runner.png";
+// 좌/우 이동용 4프레임 스프라이트 시트
+import mimicLeft from "../../assets/Runner.png";
+import mimicRight from "../../assets/Runner.png";
 import { DIFFICULTY, DIFFICULTY_CHANGED } from "../../type/difficulty";
 
 interface RunnerProps {
@@ -27,10 +29,9 @@ const GOAL_LOCK_TIME = 0.2;
 const PANIC_RECALC_DIST = SAFE_INNER;
 const PLAYER_PIXEL_TRIGGER = 24;
 
-const SPRITE_W = 16;
-const SPRITE_H = 16;
+// ▼ 4프레임 시트. 프레임 크기는 이미지 로드 후 계산.
+const FRAMES = 4;
 const SPRITE_SCALE = 2;
-const FRAMES = 1;
 const ANIM_FPS = 8;
 const COLLIDE_RADIUS = 20;
 const COLLIDE_COOLDOWN = 0.8;
@@ -144,9 +145,8 @@ function pickEscapePath(
 
 const Runner = ({ grid, paused }: RunnerProps) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  // ✅ 난이도 변경 감지를 위한 상태
   const [difficultyVersion, setDifficultyVersion] = useState(0);
-  
+
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -166,10 +166,24 @@ const Runner = ({ grid, paused }: RunnerProps) => {
     canvas.style.backgroundColor = "transparent";
     canvas.style.zIndex = "5";
 
-    const img = new Image();
-    img.src = runnerPng;
+    // 좌/우 시트 로드
+    const imgLeft = new Image();
+    imgLeft.src = mimicLeft;
+    const imgRight = new Image();
+    imgRight.src = mimicRight;
 
-    // ✅ 현재 난이도 로깅
+    // 프레임 크기(런타임 계산, 기본값은 64)
+    let frameWLeft = 64, frameHLeft = 64;
+    let frameWRight = 64, frameHRight = 64;
+    imgLeft.onload = () => {
+      frameWLeft = Math.floor(imgLeft.naturalWidth / FRAMES) || frameWLeft;
+      frameHLeft = imgLeft.naturalHeight || frameHLeft;
+    };
+    imgRight.onload = () => {
+      frameWRight = Math.floor(imgRight.naturalWidth / FRAMES) || frameWRight;
+      frameHRight = imgRight.naturalHeight || frameHRight;
+    };
+
     console.log(`[Runner] 난이도: ${DIFFICULTY.name}, 속도: ${DIFFICULTY.runnerSpeed} 타일/초`);
 
     const state = {
@@ -185,6 +199,7 @@ const Runner = ({ grid, paused }: RunnerProps) => {
       lastPdist: Number.POSITIVE_INFINITY,
       preferLeft: true,
       collideCd: 0,
+      lastVx: 1, // ≥0 오른쪽, <0 왼쪽
     };
 
     if (!globalRunnerState || !globalRunnerState.initialized) {
@@ -208,18 +223,14 @@ const Runner = ({ grid, paused }: RunnerProps) => {
     const onRepositionMobs = () => {
       const WORLD_W = MAP_WIDTH * TILE_SIZE * SCALE;
       const WORLD_H = MAP_HEIGHT * TILE_SIZE * SCALE;
-      
-      const targetCellX = state.targetX < WORLD_W / 2 
-        ? Math.floor(MAP_WIDTH * 0.8) 
-        : Math.floor(MAP_WIDTH * 0.2);
-      const targetCellY = state.targetY < WORLD_H / 2 
-        ? Math.floor(MAP_HEIGHT * 0.8) 
-        : Math.floor(MAP_HEIGHT * 0.2);
-      
+
+      const targetCellX = state.targetX < WORLD_W / 2 ? Math.floor(MAP_WIDTH * 0.8) : Math.floor(MAP_WIDTH * 0.2);
+      const targetCellY = state.targetY < WORLD_H / 2 ? Math.floor(MAP_HEIGHT * 0.8) : Math.floor(MAP_HEIGHT * 0.2);
+
       let foundX = targetCellX;
       let foundY = targetCellY;
       let found = false;
-      
+
       for (let radius = 0; radius < 10 && !found; radius++) {
         for (let dy = -radius; dy <= radius && !found; dy++) {
           for (let dx = -radius; dx <= radius && !found; dx++) {
@@ -235,18 +246,18 @@ const Runner = ({ grid, paused }: RunnerProps) => {
           }
         }
       }
-      
+
       state.px = (foundX + 0.5) * CELL_SIZE;
       state.py = (foundY + 1) * CELL_SIZE;
-      
+
       if (globalRunnerState) {
         globalRunnerState.px = state.px;
         globalRunnerState.py = state.py;
       }
-      
+
       state.path = [];
       state.mode = "idle";
-      
+
       console.log(`Runner repositioned to opposite corner: (${foundX}, ${foundY})`);
     };
     window.addEventListener("reposition-mobs", onRepositionMobs as EventListener);
@@ -287,20 +298,24 @@ const Runner = ({ grid, paused }: RunnerProps) => {
       if (paused) {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         ctx.imageSmoothingEnabled = false;
-    
+
+        // 일시정지 시 현재 방향 기준 첫 프레임 표시
+        const useRight = state.lastVx >= 0;
+        const img = useRight ? imgRight : imgLeft;
+        const fw = useRight ? frameWRight : frameWLeft;
+        const fh = useRight ? frameHRight : frameHLeft;
+        const destW = fw * SPRITE_SCALE;
+        const destH = fh * SPRITE_SCALE;
         if (img.complete && img.naturalWidth > 0) {
-          const destW = SPRITE_W * SPRITE_SCALE;
-          const destH = SPRITE_H * SPRITE_SCALE;
           ctx.drawImage(
             img,
-            0, 0, SPRITE_W, SPRITE_H,
+            0, 0, fw, fh,
             Math.floor(state.px - destW / 2),
             Math.floor(state.py - destH),
             destW, destH
           );
         }
         raf = requestAnimationFrame(loop);
-        return;
         return;
       }
 
@@ -321,7 +336,6 @@ const Runner = ({ grid, paused }: RunnerProps) => {
         state.mode = "escape";
         state.pathTimer = PATH_RECALC_TIME;
       }
-
 
       const pcx = Math.floor(state.targetX / CELL_SIZE);
       const pcy = Math.floor(state.targetY / CELL_SIZE);
@@ -358,10 +372,12 @@ const Runner = ({ grid, paused }: RunnerProps) => {
           state.path.shift();
         } else {
           const denom = Math.max(d2, 1e-6);
-          // ✅ 매 프레임 최신 난이도 속도 사용
           const speed = DIFFICULTY.runnerSpeed * CELL_SIZE;
           const vx = (ndx / denom) * speed;
           const vy = (ndy / denom) * speed;
+
+          // 방향 기록
+          if (Math.abs(vx) > 0.001) state.lastVx = vx;
 
           const totalDx = vx * dt;
           const totalDy = vy * dt;
@@ -399,12 +415,19 @@ const Runner = ({ grid, paused }: RunnerProps) => {
 
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       ctx.imageSmoothingEnabled = false;
-      if (img.complete && img.naturalWidth > 0) {
-        const destW = SPRITE_W * SPRITE_SCALE;
-        const destH = SPRITE_H * SPRITE_SCALE;
+
+      // 방향에 따른 시트 선택 + 프레임 그리기
+      const useRight = state.lastVx >= 0;
+      const sheet = useRight ? imgRight : imgLeft;
+      const fw = useRight ? frameWRight : frameWLeft;
+      const fh = useRight ? frameHRight : frameHLeft;
+
+      if (sheet.complete && sheet.naturalWidth > 0) {
+        const destW = fw * SPRITE_SCALE;
+        const destH = fh * SPRITE_SCALE;
         ctx.drawImage(
-          img,
-          0, 0, SPRITE_W, SPRITE_H,
+          sheet,
+          fw * state.frame, 0, fw, fh,
           Math.floor(state.px - destW / 2),
           Math.floor(state.py - destH),
           destW, destH
@@ -427,15 +450,14 @@ const Runner = ({ grid, paused }: RunnerProps) => {
       window.removeEventListener("reposition-mobs", onRepositionMobs as EventListener);
       window.removeEventListener("reposition-mobs", onRepositionMobs as EventListener);
     };
-  }, [grid, paused, difficultyVersion]); // ✅ difficultyVersion 의존성 추가
+  }, [grid, paused, difficultyVersion]); // 기존 의존성 유지
 
-  // ✅ 난이도 변경 감지
+  // 난이도 변경 감지
   useEffect(() => {
     const handleDifficultyChange = () => {
       console.log(`[Runner] 난이도 변경 감지: ${DIFFICULTY.name}`);
-      setDifficultyVersion(v => v + 1); // 컴포넌트 리렌더링 트리거
+      setDifficultyVersion(v => v + 1);
     };
-
     window.addEventListener(DIFFICULTY_CHANGED, handleDifficultyChange);
     return () => window.removeEventListener(DIFFICULTY_CHANGED, handleDifficultyChange);
   }, []);
@@ -448,6 +470,5 @@ const Runner = ({ grid, paused }: RunnerProps) => {
     />
   );
 };
-
 
 export default Runner;

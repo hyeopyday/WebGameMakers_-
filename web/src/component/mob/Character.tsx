@@ -43,7 +43,6 @@ const DIR = {
 
 type DirType = typeof DIR[keyof typeof DIR];
 
-// ✅ 전역 상태: 한 번만 선언
 let globalState: {
   px: number;
   py: number;
@@ -109,17 +108,15 @@ const Character = ({ grid, paused }: CharacterProps) => {
         s: false,
         d: false,
       },
-      effects: [] as { x: number; y: number; t: number; life: number }[],
+      effects: [] as { x: number; y: number; t: number; life: number; kind?: "pulse" | "heal" | "blink" }[],
       hp: DIFFICULTY.playerMaxHP,
       maxHP: DIFFICULTY.playerMaxHP,
       invincibleUntil: 0,
       blinkPhase: 0,
       isDead: false,
-      // ✅ 누락됐던 필드 추가
       spaceHeld: false,
     };
 
-    // ✅ 스폰/전역 위치 초기화 로직 정리
     if (!globalState || !globalState.initialized) {
       const spawn = findSpawnPoint(grid, { clearance: 0 });
       state.px = spawn.x;
@@ -136,9 +133,8 @@ const Character = ({ grid, paused }: CharacterProps) => {
         e.preventDefault();
         if (!state.spaceHeld) {
           state.spaceHeld = true;
-          // ❗ useItem()는 정의/임포트가 없어서 런타임 에러 유발.
-          // 필요하면 전역 이벤트로 대체:
-          // window.dispatchEvent(new CustomEvent("use-item"));
+          // 필요 시 전역 아이템 사용 이벤트로 대체
+          // window.dispatchEvent(new CustomEvent("use-item", { detail: { slotIndex: 0 } }));
         }
         return;
       }
@@ -198,6 +194,28 @@ const Character = ({ grid, paused }: CharacterProps) => {
     };
     window.addEventListener("reset-hp", onResetHP);
 
+    // ▼ 추가: ItemSlots에서 보내는 "use-item" 이벤트 수신
+    const onUseItem = (e: Event) => {
+      const ce = e as CustomEvent<{ slotIndex?: number }>;
+      const slot = ce.detail?.slotIndex ?? 0;
+
+      // 기본 이펙트: 원형 파동
+      state.effects.push({ x: state.px, y: state.py, t: 0, life: 0.4, kind: "pulse" });
+
+      // 슬롯별 간단한 예시 동작 (필요 시 실제 아이템 로직으로 교체)
+      if (slot === 0) {
+        // 힐 이펙트 예시
+        state.hp = Math.min(state.maxHP, state.hp + 1);
+        state.effects.push({ x: state.px, y: state.py, t: 0, life: 0.25, kind: "heal" });
+      } else if (slot === 1) {
+        // 짧은 무적 예시
+        state.invincibleUntil = Math.max(state.invincibleUntil, performance.now() + 600);
+        state.effects.push({ x: state.px, y: state.py, t: 0, life: 0.25, kind: "blink" });
+      }
+      // slot === 2 등은 프로젝트 규칙에 맞춰 확장
+    };
+    window.addEventListener("use-item", onUseItem as EventListener);
+
     const octantToDir: DirType[] = [
       DIR.LEFT,
       DIR.DOWN_LEFT,
@@ -229,7 +247,6 @@ const Character = ({ grid, paused }: CharacterProps) => {
       const destX = Math.floor(state.px - destW / 2);
       const destY = Math.floor(state.py - destH);
 
-      // ✅ 중복 블록/중복 return 제거
       if (paused || state.isDead) {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         ctx.imageSmoothingEnabled = false;
@@ -314,6 +331,7 @@ const Character = ({ grid, paused }: CharacterProps) => {
         ctx.drawImage(img, sx, sy, frameW, frameH, destX, destY, destW, destH);
       }
 
+      // 이펙트 업데이트 및 렌더링
       for (let i = state.effects.length - 1; i >= 0; i--) {
         const e = state.effects[i];
         e.t += dt;
@@ -321,6 +339,35 @@ const Character = ({ grid, paused }: CharacterProps) => {
       }
       for (const e of state.effects) {
         const k = Math.min(1, e.t / e.life);
+
+        if (e.kind === "heal") {
+          ctx.save();
+          ctx.globalAlpha = 1 - k;
+          ctx.lineWidth = 2;
+          ctx.strokeStyle = "#66ff99";
+          ctx.beginPath();
+          ctx.arc(Math.floor(e.x), Math.floor(e.y - destH / 2), 14 + 24 * k, 0, Math.PI * 2);
+          ctx.stroke();
+          ctx.restore();
+          continue;
+        }
+
+        if (e.kind === "blink") {
+          ctx.save();
+          ctx.globalAlpha = 0.6 * (1 - k);
+          ctx.lineWidth = 2;
+          ctx.strokeStyle = "#88ccff";
+          ctx.strokeRect(
+            Math.floor(e.x - 10 - 20 * k),
+            Math.floor(e.y - destH / 2 - 10 - 20 * k),
+            20 + 40 * k,
+            20 + 40 * k
+          );
+          ctx.restore();
+          continue;
+        }
+
+        // 기본 파동
         const r = 16 + 64 * k;
         const alpha = 1 - k;
         ctx.save();
@@ -352,8 +399,8 @@ const Character = ({ grid, paused }: CharacterProps) => {
       document.removeEventListener("keydown", onKeyDown);
       document.removeEventListener("keyup", onKeyUp);
       window.removeEventListener("player-hit", onPlayerHit as EventListener);
-      // ✅ 중복 제거
       window.removeEventListener("reset-hp", onResetHP);
+      window.removeEventListener("use-item", onUseItem as EventListener);
     };
   }, [grid, paused]);
 
