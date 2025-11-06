@@ -14,7 +14,7 @@ import Map from "./Map/Map";
 import { type Mode } from "../type/numberBaseball";
 import "./Agency.css";
 
-import type { Item, ItemGrade, ItemId } from "../type/Item/items";
+import type { Item, ItemGrade } from "../type/Item/items";
 import { B_ITEMS, S_ITEMS, pickRandom } from "../type/Item/items";
 
 interface AgencyProps {
@@ -61,11 +61,6 @@ function Agency({ difficulty, onMainMenu }: AgencyProps) {
       // 꽉 찼으면 뒤(오른쪽) 제거 후 추가
       return [...prev.slice(0, 2), newItem];
     });
-  }
-
-  /** 아이템 사용 및 제거 (칸 비우고 좌측으로 땡김) */
-  function consumeItemAt(slotIndex: number) {
-    setItems(prev => prev.filter((_, i) => i !== slotIndex));
   }
 
   /** 아이템 실제 효과 발동 */
