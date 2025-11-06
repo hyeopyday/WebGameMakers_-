@@ -4,7 +4,6 @@ import "./GameVictory.css";
 import victoryImg from "../../assets/victory.png";
 
 interface GameVictoryProps {
-  onContinue: () => void;
   onMainMenu: () => void;
 }
 

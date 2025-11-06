@@ -15,13 +15,13 @@ import { type Mode } from "../type/numberBaseball";
 import "./Agency.css";
 
 interface AgencyProps {
-    difficulty: Mode;
-    onMainMenu: () => void;
+  difficulty: Mode;
+  onMainMenu: () => void;
 }
 
 function Agency({ difficulty, onMainMenu }: AgencyProps) {
-    const length = MODE_LENGTH[difficulty];
-    const [secret, setSecret] = useState(() => generateSecret(length));
+  const length = MODE_LENGTH[difficulty];
+  const [secret] = useState(() => generateSecret(length));
 
   const [isPaused, setPaused] = useState(false);
   const [nbOpen, setNbOpen] = useState(false);
@@ -31,6 +31,19 @@ function Agency({ difficulty, onMainMenu }: AgencyProps) {
   const [history, setHistory] = useState<string[]>([]);
 
   const [grid, setGrid] = useState<Cell[][]>([]);
+
+
+  useEffect(() => {
+    try {
+      if (typeof localStorage !== "undefined") {
+        localStorage.setItem("game.difficulty.mode", String(difficulty));
+        console.log(`난이도 ${difficulty} 저장됨 (localStorage)`);
+      }
+    } catch (err) {
+      console.warn("localStorage 접근 실패:", err);
+    }
+  }, [difficulty]);
+
 
   useEffect(() => {
     const handleKeyPress = (e: KeyboardEvent) => {
@@ -81,19 +94,19 @@ function Agency({ difficulty, onMainMenu }: AgencyProps) {
   } | null) => {
     setNbOpen(false);
     setPaused(false);
-    
+
     if (!res) return;
-    
+
     const idx = attemptCount + 1;
     setAttemptCount(idx);
     setHistory((prev) => [...prev, res.historyLine]);
-    
+
     if (res.win) {
       console.log("숫자야구 승리! 게임 클리어!");
       window.dispatchEvent(new CustomEvent("game-win"));
       return;
     }
-    
+
     window.dispatchEvent(new CustomEvent("reposition-mobs"));
   };
 
@@ -141,35 +154,35 @@ function Agency({ difficulty, onMainMenu }: AgencyProps) {
 
   return (
     <div id="Agency">
-        <div className="hp-bar">
-            <HPBar />
-        </div>
-        <ItemSlots />
+      <div className="hp-bar">
+        <HPBar />
+      </div>
+      <ItemSlots />
 
-        <div className="game-display">
-            <Map grid={grid} paused={isPaused} />
-            <NumberBaseball
-                open={nbOpen}
-                length={length}
-                secret={secret}
-                attemptIndex1={attemptCount + 1}
-                onClose={handleClose}
-                difficulty={difficulty}
-                history={history}
-            />
-        </div>
-        <div
-            className="nb-history"
-        >
-            <h3>
-                ⚾ Number Baseball ⚾
-            </h3>
-            {history.length === 0 ? (
-                <div style={{ opacity: 0.6 }}>No attempts yet.</div>
-            ) : (
-                history.map((line, i) => <div className="history"  key={i}>{line}</div>)
-            )}
-        </div>
+      <div className="game-display">
+        <Map grid={grid} paused={isPaused} />
+        <NumberBaseball
+          open={nbOpen}
+          length={length}
+          secret={secret}
+          attemptIndex1={attemptCount + 1}
+          onClose={handleClose}
+          difficulty={difficulty}
+          history={history}
+        />
+      </div>
+      <div
+        className="nb-history"
+      >
+        <h3>
+          ⚾ Number Baseball ⚾
+        </h3>
+        {history.length === 0 ? (
+          <div style={{ opacity: 0.6 }}>No attempts yet.</div>
+        ) : (
+          history.map((line, i) => <div className="history" key={i}>{line}</div>)
+        )}
+      </div>
 
       <PauseUI
         onResume={handleResume}
