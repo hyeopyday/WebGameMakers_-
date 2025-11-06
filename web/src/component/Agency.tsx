@@ -34,15 +34,23 @@ function Agency({ difficulty, onMainMenu }: AgencyProps) {
   const [history, setHistory] = useState<string[]>([]);
 
   const [grid, setGrid] = useState<Cell[][]>([]);
-
-  // 🔹 인벤토리 (최대 3개, 왼→오른쪽)
   const [items, setItems] = useState<Item[]>([]);
 
-  /** 숫자야구 결과 → 아이템 등급 판정 */
+  useEffect(() => {
+    try {
+      if (typeof localStorage !== "undefined") {
+        localStorage.setItem("game.difficulty.mode", String(difficulty));
+        console.log(`난이도 ${difficulty} 저장됨 (localStorage)`);
+      }
+    } catch (err) {
+      console.warn("localStorage 접근 실패:", err);
+    }
+  }, [difficulty]);
+
   function decideGrade(strike: number, ball: number, out: number): ItemGrade | null {
     // 조건 표 그대로 구현
     if ((strike === 1 && ball === 2 && out === 1) ||
-        (strike === 2 && ball === 1 && out === 1)) {
+      (strike === 2 && ball === 1 && out === 1)) {
       return "S";
     }
     if (strike === 0 && ball === 3 && out === 1) return "B";
@@ -63,17 +71,16 @@ function Agency({ difficulty, onMainMenu }: AgencyProps) {
     });
   }
 
-  /** 아이템 실제 효과 발동 */
   function useItem(item: Item) {
     switch (item.id) {
       case "SPEED_UP": {
         // 캐릭터 속도 6초 버프
-        window.dispatchEvent(new CustomEvent("item-speed-up", { detail: { mult: 1.6, duration: 6000 }}));
+        window.dispatchEvent(new CustomEvent("item-speed-up", { detail: { mult: 1.6, duration: 6000 } }));
         break;
       }
       case "RECOVERY": {
         // 체력 1 회복
-        window.dispatchEvent(new CustomEvent("player-heal", { detail: { heal: 1 }}));
+        window.dispatchEvent(new CustomEvent("player-heal", { detail: { heal: 1 } }));
         break;
       }
       case "TELEPORT": {
@@ -83,17 +90,17 @@ function Agency({ difficulty, onMainMenu }: AgencyProps) {
       }
       case "BALL": {
         // 체이서 잠깐 멈춤(혹은 느리게) 3.5초
-        window.dispatchEvent(new CustomEvent("item-bondage", { detail: { slow: 0.2, duration: 3500 }}));
+        window.dispatchEvent(new CustomEvent("item-bondage", { detail: { slow: 0.2, duration: 3500 } }));
         break;
       }
       case "VISIBILITY": {
         // 시야 8초 밝게
-        window.dispatchEvent(new CustomEvent("item-visibility", { detail: { radius: 360, duration: 8000 }}));
+        window.dispatchEvent(new CustomEvent("item-visibility", { detail: { radius: 360, duration: 8000 } }));
         break;
       }
       case "BONDAGE": {
         // 적 속박 5초 (더 강력)
-        window.dispatchEvent(new CustomEvent("item-bondage", { detail: { slow: 0.05, duration: 5000 }}));
+        window.dispatchEvent(new CustomEvent("item-bondage", { detail: { slow: 0.05, duration: 5000 } }));
         break;
       }
       case "STRIKE": {
@@ -111,7 +118,6 @@ function Agency({ difficulty, onMainMenu }: AgencyProps) {
     }
   }
 
-  // ================= 기존 훅들 =================
   useEffect(() => {
     const handleKeyPress = (e: KeyboardEvent) => {
       if (e.key === 'm' || e.key === 'M') {
@@ -143,12 +149,15 @@ function Agency({ difficulty, onMainMenu }: AgencyProps) {
   }, []);
 
   useEffect(() => {
-    const onGameWin = () => { setPaused(true); };
+    const onGameWin = () => {
+      setPaused(true);
+    };
     window.addEventListener("game-win", onGameWin);
     return () => window.removeEventListener("game-win", onGameWin);
   }, []);
 
   // 🔹 Item 사용 이벤트 수신 (E키 or 클릭)
+  ///////✅
   useEffect(() => {
     const onUseItem = (e: Event) => {
       const ce = e as CustomEvent<{ slotIndex: number }>;
@@ -164,6 +173,7 @@ function Agency({ difficulty, onMainMenu }: AgencyProps) {
     window.addEventListener("use-item", onUseItem as EventListener);
     return () => window.removeEventListener("use-item", onUseItem as EventListener);
   }, [secret]);
+  ///////
 
   const handleClose = (res: {
     guess: string;
@@ -185,7 +195,6 @@ function Agency({ difficulty, onMainMenu }: AgencyProps) {
       return;
     }
 
-    // 🔹 숫자야구 결과 → 아이템 지급
     const grade = decideGrade(res.result.strike, res.result.ball, res.result.out);
     if (grade) {
       const item = grade === "S" ? pickRandom(S_ITEMS) : pickRandom(B_ITEMS);
@@ -238,8 +247,6 @@ function Agency({ difficulty, onMainMenu }: AgencyProps) {
       <div className="hp-bar">
         <HPBar />
       </div>
-
-      {/* 🔹 인벤토리 표시 */}
       <ItemSlots items={items} />
 
       <div className="game-display">
@@ -254,13 +261,17 @@ function Agency({ difficulty, onMainMenu }: AgencyProps) {
           history={history}
         />
       </div>
-
-      <div className="nb-history">
-        <h3>⚾ Number Baseball ⚾</h3>
-        {history.length === 0
-          ? <div style={{ opacity: 0.6 }}>No attempts yet.</div>
-          : history.map((line, i) => <div className="history" key={i}>{line}</div>)
-        }
+      <div
+        className="nb-history"
+      >
+        <h3>
+          ⚾ Number Baseball ⚾
+        </h3>
+        {history.length === 0 ? (
+          <div style={{ opacity: 0.6 }}>No attempts yet.</div>
+        ) : (
+          history.map((line, i) => <div className="history" key={i}>{line}</div>)
+        )}
       </div>
 
       <PauseUI onResume={handleResume} onMainMenu={onMainMenu} onSettings={handleSettings} />

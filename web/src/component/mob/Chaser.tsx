@@ -11,13 +11,15 @@ import {
 } from "../../type/type";
 import { moveWithWorldCollision } from "./Physic/Physic";
 import enemyPng from "../../assets/Chaser.png";
+import { DIFFICULTY, DIFFICULTY_CHANGED } from "../../type/difficulty";
 
 interface ChaserProps {
   grid: Cell[][]; 
   paused?: boolean;
+  // ✅ 여러 개체 지원을 위한 식별자(기본 0). 기존 호출부 호환.
+  id?: number;
 }
 
-const CHASER_SPEED = 170;
 const PATH_RECALC_TIME = 0.3;
 const ATTACK_RANGE = 25;
 const ATTACK_FREEZE = 0.4;
@@ -29,12 +31,12 @@ const ANIM_FPS = 8;
 const CELL_SIZE = TILE_SIZE * SCALE;
 const ATTACK_COOLDOWN = 0.9;
 
-// ✅ 위치 유지를 위한 전역 상태
-let globalChaserState: {
+// ✅ 단일 전역 → 다중 개체 전역 상태 맵
+const globalChaserState: Record<number, {
   px: number;
   py: number;
   initialized: boolean;
-} | null = null;
+}> = {};
 
 function findPath(
   grid: Cell[][],
@@ -94,8 +96,10 @@ function findPath(
   return [];
 }
 
-const Chaser = ({ grid, paused }: ChaserProps) => {
+const Chaser = ({ grid, paused, id = 0 }: ChaserProps) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  // ✅ 난이도 속도를 ref로 유지
+  const speedRef = useRef(DIFFICULTY.chaserSpeed);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -119,6 +123,10 @@ const Chaser = ({ grid, paused }: ChaserProps) => {
     const enemyImg = new Image();
     enemyImg.src = enemyPng;
 
+    // ✅ 초기 속도 설정
+    speedRef.current = DIFFICULTY.chaserSpeed;
+    console.log(`[Chaser ${id}] 시작 - 난이도: ${DIFFICULTY.name}, 속도: ${speedRef.current} 타일/초`);
+
     const state = {
       px: 0,
       py: 0,
@@ -136,15 +144,15 @@ const Chaser = ({ grid, paused }: ChaserProps) => {
       lastTime: 0,
     };
 
-    // ✅ 최초 한 번만 스폰
-    if (!globalChaserState || !globalChaserState.initialized) {
+    // ✅ 개체별 전역 상태 초기화/복원
+    if (!globalChaserState[id] || !globalChaserState[id].initialized) {
       const s = findSpawnPoint(grid, { clearance: 0 });
       state.px = s.x;
       state.py = s.y;
-      globalChaserState = { px: s.x, py: s.y, initialized: true };
+      globalChaserState[id] = { px: s.x, py: s.y, initialized: true };
     } else {
-      state.px = globalChaserState.px;
-      state.py = globalChaserState.py;
+      state.px = globalChaserState[id].px;
+      state.py = globalChaserState[id].py;
     }
 
     const onPlayerPos = (e: Event) => {
@@ -155,28 +163,26 @@ const Chaser = ({ grid, paused }: ChaserProps) => {
     };
     window.addEventListener("player-pos", onPlayerPos as EventListener);
 
-    // ✅ 몹 재배치 이벤트 리스너 - 무작위 위치
     const onRepositionMobs = () => {
-      // 새로운 무작위 스폰 위치 찾기
       const newSpawn = findSpawnPoint(grid, { clearance: 0 });
       state.px = newSpawn.x;
       state.py = newSpawn.y;
-      
-      // 전역 상태 업데이트
-      if (globalChaserState) {
-        globalChaserState.px = state.px;
-        globalChaserState.py = state.py;
-      }
-      
-      // 경로 초기화
+      // ✅ 개체별 좌표 저장
+      globalChaserState[id] = { px: state.px, py: state.py, initialized: true };
       state.path = [];
       state.mode = "idle";
       state.attackCD = 0;
       state.attackFreeze = 0;
-      
-      console.log(`Chaser repositioned to random location: (${Math.floor(state.px)}, ${Math.floor(state.py)})`);
+      console.log(`Chaser ${id} repositioned to random location: (${Math.floor(state.px)}, ${Math.floor(state.py)})`);
     };
     window.addEventListener("reposition-mobs", onRepositionMobs as EventListener);
+
+    // ✅ 난이도 변경 이벤트 리스너
+    const onDifficultyChange = () => {
+      speedRef.current = DIFFICULTY.chaserSpeed;
+      console.log(`[Chaser ${id}] 난이도 변경! 새 속도: ${speedRef.current} 타일/초 (${DIFFICULTY.name})`);
+    };
+    window.addEventListener(DIFFICULTY_CHANGED, onDifficultyChange);
 
     let raf = 0;
 
@@ -188,19 +194,19 @@ const Chaser = ({ grid, paused }: ChaserProps) => {
       if (paused) {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         ctx.imageSmoothingEnabled = false;
-    
+
         const dirOffset = state.dir * SPRITE_H;
         const animRow =
           state.mode === "attack"
             ? 4 * SPRITE_H + dirOffset
             : 0 * SPRITE_H + dirOffset;
-    
+
         const sx = state.frame * SPRITE_W;
         const sy = animRow;
-    
+
         const destW = SPRITE_W * SPRITE_SCALE;
         const destH = SPRITE_H * SPRITE_SCALE;
-    
+
         ctx.drawImage(
           enemyImg,
           sx, sy, SPRITE_W, SPRITE_H,
@@ -208,9 +214,9 @@ const Chaser = ({ grid, paused }: ChaserProps) => {
           state.py - destH,
           destW, destH
         );
-    
+
         raf = requestAnimationFrame(loop);
-        return;
+        return; // ✅ 중복 return 제거
       }
 
       state.pathTimer += dt;
@@ -251,25 +257,30 @@ const Chaser = ({ grid, paused }: ChaserProps) => {
       }
 
       if (state.attackFreeze <= 0 && state.path.length > 0) {
-        const next = state.path[0];
+        const idx = Math.min(1, state.path.length - 1);
+        const next = state.path[idx];
+
         const tx = next.x * CELL_SIZE + CELL_SIZE / 2;
         const ty = next.y * CELL_SIZE + CELL_SIZE / 2;
         const ndx = tx - state.px;
         const ndy = ty - state.py;
         const distToNext = Math.hypot(ndx, ndy);
-        if (distToNext < 4) state.path.shift();
-        else {
-          const vx = (ndx / distToNext) * CHASER_SPEED;
-          const vy = (ndy / distToNext) * CHASER_SPEED;
+
+        if (distToNext < 4) {
+          state.path.shift();
+        } else {
+          // ✅ ref에서 최신 속도 가져오기
+          const speed = speedRef.current * CELL_SIZE;
+          const vx = (ndx / Math.max(distToNext, 1e-6)) * speed;
+          const vy = (ndy / Math.max(distToNext, 1e-6)) * speed;
+
           const moved = moveWithWorldCollision(state.px, state.py, vx, vy, dt, grid);
           state.px = moved.x;
           state.py = moved.y;
 
-          // ✅ 전역 상태 업데이트
-          if (globalChaserState) {
-            globalChaserState.px = state.px;
-            globalChaserState.py = state.py;
-          }
+          // ✅ 개체별 좌표 저장
+          globalChaserState[id].px = state.px;
+          globalChaserState[id].py = state.py;
         }
       }
 
@@ -311,8 +322,9 @@ const Chaser = ({ grid, paused }: ChaserProps) => {
       cancelAnimationFrame(raf);
       window.removeEventListener("player-pos", onPlayerPos as EventListener);
       window.removeEventListener("reposition-mobs", onRepositionMobs as EventListener);
+      window.removeEventListener(DIFFICULTY_CHANGED, onDifficultyChange);
     };
-  }, [grid, paused]);
+  }, [grid, paused, id]);
 
   return (
     <canvas

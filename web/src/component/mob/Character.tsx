@@ -21,11 +21,12 @@ import {
   findSpawnPoint
 } from "../../type/type";
 import { moveWithWorldCollision } from "./Physic/Physic";
+import { DIFFICULTY } from "../../type/difficulty";
 
 const FRAMES = 4;
 
 interface CharacterProps {
-  grid: Cell[][]; 
+  grid: Cell[][];
   paused?: boolean;
 }
 
@@ -56,7 +57,6 @@ const Character = ({ grid, paused }: CharacterProps) => {
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
-
     if (!grid?.length || !grid[0]?.length) return;
 
     canvas.style.position = "absolute";
@@ -108,12 +108,13 @@ const Character = ({ grid, paused }: CharacterProps) => {
         s: false,
         d: false,
       },
-      effects: [] as { x: number; y: number; t: number; life: number }[],
-      hp: 3,
-      maxHP: 3,
+      effects: [] as { x: number; y: number; t: number; life: number; kind?: "pulse" | "heal" | "blink" }[],
+      hp: DIFFICULTY.playerMaxHP,
+      maxHP: DIFFICULTY.playerMaxHP,
       invincibleUntil: 0,
       blinkPhase: 0,
       isDead: false,
+      spaceHeld: false,
     };
 
     if (!globalState || !globalState.initialized) {
@@ -128,15 +129,28 @@ const Character = ({ grid, paused }: CharacterProps) => {
 
     const onKeyDown = (e: KeyboardEvent) => {
       if (paused || state.isDead) { e.preventDefault(); return; }
+      if (e.code === "Space") {
+        e.preventDefault();
+        if (!state.spaceHeld) {
+          state.spaceHeld = true;
+          // 필요 시 전역 아이템 사용 이벤트로 대체
+          // window.dispatchEvent(new CustomEvent("use-item", { detail: { slotIndex: 0 } }));
+        }
+        return;
+      }
       const k = e.key as keyof typeof state.key;
       if (k in state.key) {
         e.preventDefault();
         state.key[k] = true;
       }
     };
-    
+
     const onKeyUp = (e: KeyboardEvent) => {
       if (paused || state.isDead) { e.preventDefault(); return; }
+      if (e.code === "Space") {
+        state.spaceHeld = false;
+        return;
+      }
       const k = e.key as keyof typeof state.key;
       if (k in state.key) {
         e.preventDefault();
@@ -152,18 +166,24 @@ const Character = ({ grid, paused }: CharacterProps) => {
       if (state.hp <= 0 || state.isDead) return;
       const now = performance.now();
       if (now < state.invincibleUntil) return;
+
       const dmg = Math.max(1, Math.floor(ce.detail?.dmg ?? 1));
       state.hp = Math.max(0, state.hp - dmg);
       state.invincibleUntil = now + 1000;
-      console.log(`[HP] ${state.hp}/${state.maxHP}`);
+
+      if (state.hp === 0) {
+        state.isDead = true;
+        window.dispatchEvent(new CustomEvent("player-dead"));
+      }
     };
     window.addEventListener("player-hit", onPlayerHit as EventListener);
 
     const onResetHP = () => {
+      state.maxHP = DIFFICULTY.playerMaxHP;
       state.hp = state.maxHP;
       state.isDead = false;
       state.invincibleUntil = 0;
-      console.log("HP 리셋!");
+
       const spawn = findSpawnPoint(grid, { clearance: 0 });
       state.px = spawn.x;
       state.py = spawn.y;
@@ -173,6 +193,28 @@ const Character = ({ grid, paused }: CharacterProps) => {
       }
     };
     window.addEventListener("reset-hp", onResetHP);
+
+    // ▼ 추가: ItemSlots에서 보내는 "use-item" 이벤트 수신
+    const onUseItem = (e: Event) => {
+      const ce = e as CustomEvent<{ slotIndex?: number }>;
+      const slot = ce.detail?.slotIndex ?? 0;
+
+      // 기본 이펙트: 원형 파동
+      state.effects.push({ x: state.px, y: state.py, t: 0, life: 0.4, kind: "pulse" });
+
+      // 슬롯별 간단한 예시 동작 (필요 시 실제 아이템 로직으로 교체)
+      if (slot === 0) {
+        // 힐 이펙트 예시
+        state.hp = Math.min(state.maxHP, state.hp + 1);
+        state.effects.push({ x: state.px, y: state.py, t: 0, life: 0.25, kind: "heal" });
+      } else if (slot === 1) {
+        // 짧은 무적 예시
+        state.invincibleUntil = Math.max(state.invincibleUntil, performance.now() + 600);
+        state.effects.push({ x: state.px, y: state.py, t: 0, life: 0.25, kind: "blink" });
+      }
+      // slot === 2 등은 프로젝트 규칙에 맞춰 확장
+    };
+    window.addEventListener("use-item", onUseItem as EventListener);
 
     const octantToDir: DirType[] = [
       DIR.LEFT,
@@ -264,6 +306,7 @@ const Character = ({ grid, paused }: CharacterProps) => {
       const moved = moveWithWorldCollision(state.px, state.py, vx, vy, dt, grid);
       state.px = moved.x;
       state.py = moved.y;
+
       if (globalState) {
         globalState.px = state.px;
         globalState.py = state.py;
@@ -288,6 +331,55 @@ const Character = ({ grid, paused }: CharacterProps) => {
         ctx.drawImage(img, sx, sy, frameW, frameH, destX, destY, destW, destH);
       }
 
+      // 이펙트 업데이트 및 렌더링
+      for (let i = state.effects.length - 1; i >= 0; i--) {
+        const e = state.effects[i];
+        e.t += dt;
+        if (e.t >= e.life) state.effects.splice(i, 1);
+      }
+      for (const e of state.effects) {
+        const k = Math.min(1, e.t / e.life);
+
+        if (e.kind === "heal") {
+          ctx.save();
+          ctx.globalAlpha = 1 - k;
+          ctx.lineWidth = 2;
+          ctx.strokeStyle = "#66ff99";
+          ctx.beginPath();
+          ctx.arc(Math.floor(e.x), Math.floor(e.y - destH / 2), 14 + 24 * k, 0, Math.PI * 2);
+          ctx.stroke();
+          ctx.restore();
+          continue;
+        }
+
+        if (e.kind === "blink") {
+          ctx.save();
+          ctx.globalAlpha = 0.6 * (1 - k);
+          ctx.lineWidth = 2;
+          ctx.strokeStyle = "#88ccff";
+          ctx.strokeRect(
+            Math.floor(e.x - 10 - 20 * k),
+            Math.floor(e.y - destH / 2 - 10 - 20 * k),
+            20 + 40 * k,
+            20 + 40 * k
+          );
+          ctx.restore();
+          continue;
+        }
+
+        // 기본 파동
+        const r = 16 + 64 * k;
+        const alpha = 1 - k;
+        ctx.save();
+        ctx.globalAlpha = alpha;
+        ctx.lineWidth = 3;
+        ctx.strokeStyle = "#ffffaa";
+        ctx.beginPath();
+        ctx.arc(Math.floor(e.x), Math.floor(e.y - destH / 2), r, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.restore();
+      }
+
       raf = requestAnimationFrame(loop);
     };
 
@@ -308,6 +400,7 @@ const Character = ({ grid, paused }: CharacterProps) => {
       document.removeEventListener("keyup", onKeyUp);
       window.removeEventListener("player-hit", onPlayerHit as EventListener);
       window.removeEventListener("reset-hp", onResetHP);
+      window.removeEventListener("use-item", onUseItem as EventListener);
     };
   }, [grid, paused]);
 
