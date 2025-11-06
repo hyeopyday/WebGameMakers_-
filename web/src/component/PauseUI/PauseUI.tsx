@@ -44,10 +44,10 @@ const PauseUI = ({ onResume, onMainMenu, onSettings }: PauseUIProps) => {
       audioManager.playSFX("/sounds/click.mp3");
       setIsVisible(false);
       
-      audioManager.stopBGM(true);
+      audioManager.stopAll();
       setTimeout(() => {
         audioManager.playBGM("/sounds/main.mp3", true);
-      }, 500);
+      }, 300);
       
       onMainMenu();
     }

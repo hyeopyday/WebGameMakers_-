@@ -16,7 +16,11 @@ const GameOver = ({ onRestart, onMainMenu }: GameOverProps) => {
   useEffect(() => {
     const handlePlayerDead = () => {
       setIsVisible(true);
-      audioManager.stopBGM(true);
+      audioManager.stopBGM(false);
+      audioManager.stopAll();
+      
+      window.dispatchEvent(new CustomEvent("reposition-mobs"));
+      
       audioManager.playSFX("/sounds/game_over.mp3");
     };
 
@@ -32,6 +36,7 @@ const GameOver = ({ onRestart, onMainMenu }: GameOverProps) => {
   const handleRestart = () => {
     audioManager.playSFX("/sounds/click.mp3");
     setIsVisible(false);
+    audioManager.stopAll();
     window.dispatchEvent(new CustomEvent("reset-hp"));
     window.dispatchEvent(new CustomEvent("reposition-mobs"));
     
@@ -45,6 +50,7 @@ const GameOver = ({ onRestart, onMainMenu }: GameOverProps) => {
   const handleMainMenu = () => {
     audioManager.playSFX("/sounds/click.mp3");
     setIsVisible(false);
+    audioManager.stopAll();
     
     setTimeout(() => {
       audioManager.playBGM("/sounds/main.mp3", true);

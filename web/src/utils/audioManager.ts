@@ -3,6 +3,7 @@ class AudioManager {
   private sfxVolume: number = 0.75;
   private currentBGM: HTMLAudioElement | null = null;
   private bgmFadingOut: boolean = false;
+  private sfxInstances: Set<HTMLAudioElement> = new Set();
 
   constructor() {
     try {
@@ -124,13 +125,27 @@ class AudioManager {
   playSFX(src: string) {
     const audio = new Audio(src);
     audio.volume = this.sfxVolume;
+    
+    this.sfxInstances.add(audio);
+    
+    audio.addEventListener('ended', () => {
+      this.sfxInstances.delete(audio);
+    });
+    
     audio.play().catch(err => {
       console.warn('SFX play failed:', err);
+      this.sfxInstances.delete(audio);
     });
   }
 
   stopAll() {
     this.stopBGM(false);
+    
+    this.sfxInstances.forEach(audio => {
+      audio.pause();
+      audio.currentTime = 0;
+    });
+    this.sfxInstances.clear();
   }
 }
 
