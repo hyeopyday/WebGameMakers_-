@@ -29,7 +29,7 @@
 
 
 ## 수정해야할 것 - 11/06 13:44 추가
-* 아이템 추가
+* 아이템 추가(clear)
 ```bash
 B 아이템 (Ball)
 속도 업
@@ -42,15 +42,14 @@ S 아이템 (Strike)
 숫자 하나 공개
 ```
 
-* 난이도 별 몹 수 수정
+* 난이도 별 몹 수 수정(clear)
 
 * 효과음 넣기
   - <https://www.sellbuymusic.com/search/soundeffect>
   
   - <https://pixabay.com/ko/sound-effects/>
 
-* PPT 만들기
-<<<<<<< HEAD
-=======
+* PPT 만들기(clear)
+
   
 >>>>>>> Item_V2
