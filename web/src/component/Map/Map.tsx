@@ -146,7 +146,7 @@ const Map = ({ grid, paused }: MapProps) => {
       />
       <Character grid={grid} paused={paused} />
       {Array.from({ length: DIFFICULTY.chaserCount }).map((_, i) => (
-        <Chaser key={`chaser-${i}`} id={i} grid={grid} paused={paused} />
+        <Chaser key={`chaser-${i}`} grid={grid} paused={paused} />
       ))}
       <Runner grid={grid} paused={paused} />
       <ArrowOverlay minDist={120} maxDist={1200} size={28} ring={36} />
