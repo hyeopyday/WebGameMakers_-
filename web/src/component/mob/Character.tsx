@@ -42,7 +42,6 @@ const DIR = {
 
 type DirType = typeof DIR[keyof typeof DIR];
 
-// ✅ 컴포넌트 외부에서 상태를 유지 (재렌더링 시에도 위치 유지)
 let globalState: {
   px: number;
   py: number;
@@ -109,7 +108,6 @@ const Character = ({ grid, paused }: CharacterProps) => {
         s: false,
         d: false,
       },
-      spaceHeld: false,
       effects: [] as { x: number; y: number; t: number; life: number }[],
       hp: 3,
       maxHP: 3,
@@ -118,33 +116,18 @@ const Character = ({ grid, paused }: CharacterProps) => {
       isDead: false,
     };
 
-    // ✅ 최초 한 번만 스폰 위치 설정
     if (!globalState || !globalState.initialized) {
       const spawn = findSpawnPoint(grid, { clearance: 0 });
       state.px = spawn.x;
       state.py = spawn.y;
       globalState = { px: spawn.x, py: spawn.y, initialized: true };
     } else {
-      // ✅ 이미 초기화된 경우 이전 위치 유지
       state.px = globalState.px;
       state.py = globalState.py;
     }
 
-    const useItem = () => {
-      window.dispatchEvent(new CustomEvent("use-item"));
-      state.effects.push({ x: state.px, y: state.py, t: 0, life: 0.35 });
-    };
-
     const onKeyDown = (e: KeyboardEvent) => {
       if (paused || state.isDead) { e.preventDefault(); return; }
-      if (e.code === "Space") {
-        e.preventDefault();
-        if (!state.spaceHeld) {
-          state.spaceHeld = true;
-          useItem();
-        }
-        return;
-      }
       const k = e.key as keyof typeof state.key;
       if (k in state.key) {
         e.preventDefault();
@@ -154,10 +137,6 @@ const Character = ({ grid, paused }: CharacterProps) => {
     
     const onKeyUp = (e: KeyboardEvent) => {
       if (paused || state.isDead) { e.preventDefault(); return; }
-      if (e.code === "Space") {
-        state.spaceHeld = false;
-        return;
-      }
       const k = e.key as keyof typeof state.key;
       if (k in state.key) {
         e.preventDefault();
@@ -169,28 +148,22 @@ const Character = ({ grid, paused }: CharacterProps) => {
     document.addEventListener("keyup", onKeyUp);
 
     const onPlayerHit = (e: Event) => {
-  const ce = e as CustomEvent<{ dmg?: number }>;
-  if (state.hp <= 0 || state.isDead) return;
-  const now = performance.now();
-  if (now < state.invincibleUntil) return;
-  
-  const dmg = Math.max(1, Math.floor(ce.detail?.dmg ?? 1));
-  state.hp = Math.max(0, state.hp - dmg);
-  state.invincibleUntil = now + 1000; // 1초 무적
-  
-  console.log(`[HP] ${state.hp}/${state.maxHP}`);
-  
-};
+      const ce = e as CustomEvent<{ dmg?: number }>;
+      if (state.hp <= 0 || state.isDead) return;
+      const now = performance.now();
+      if (now < state.invincibleUntil) return;
+      const dmg = Math.max(1, Math.floor(ce.detail?.dmg ?? 1));
+      state.hp = Math.max(0, state.hp - dmg);
+      state.invincibleUntil = now + 1000;
+      console.log(`[HP] ${state.hp}/${state.maxHP}`);
+    };
     window.addEventListener("player-hit", onPlayerHit as EventListener);
 
-    // HP 리셋 이벤트
     const onResetHP = () => {
       state.hp = state.maxHP;
       state.isDead = false;
       state.invincibleUntil = 0;
       console.log("HP 리셋!");
-      
-      // 위치도 리셋
       const spawn = findSpawnPoint(grid, { clearance: 0 });
       state.px = spawn.x;
       state.py = spawn.y;
@@ -223,7 +196,7 @@ const Character = ({ grid, paused }: CharacterProps) => {
       if (!state.lastTime) state.lastTime = t;
       const dt = Math.min(0.033, (t - state.lastTime) / 1000);
       state.lastTime = t;
-    
+
       const img = imgs[state.dir];
       const frameW = img.naturalWidth > 0 ? Math.floor(img.naturalWidth / FRAMES) : 64;
       const frameH = img.naturalHeight > 0 ? img.naturalHeight : 64;
@@ -231,11 +204,11 @@ const Character = ({ grid, paused }: CharacterProps) => {
       const destH = frameH * SPRITE_SCALE;
       const destX = Math.floor(state.px - destW / 2);
       const destY = Math.floor(state.py - destH);
-    
+
       if (paused || state.isDead) {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         ctx.imageSmoothingEnabled = false;
-    
+
         let skipDraw = false;
         if (state.invincibleUntil > performance.now()) {
           state.blinkPhase += dt * 20;
@@ -243,47 +216,39 @@ const Character = ({ grid, paused }: CharacterProps) => {
         } else {
           state.blinkPhase = 0;
         }
-    
+
         if (!skipDraw) {
           const sx = (state.frame % FRAMES) * frameW;
           const sy = 0;
-          
-          // 사망 시 어둡게 표시
-          if (state.isDead) {
-            ctx.globalAlpha = 0.3;
-          }
-          
+          if (state.isDead) ctx.globalAlpha = 0.3;
           ctx.drawImage(img, sx, sy, frameW, frameH, destX, destY, destW, destH);
-          
-          if (state.isDead) {
-            ctx.globalAlpha = 1;
-          }
+          if (state.isDead) ctx.globalAlpha = 1;
         }
-    
+
         raf = requestAnimationFrame(loop);
         return;
       }
-    
+
       const upK = state.key.ArrowUp || state.key.w;
       const dnK = state.key.ArrowDown || state.key.s;
       const lfK = state.key.ArrowLeft || state.key.a;
       const rtK = state.key.ArrowRight || state.key.d;
-    
+
       let vx = 0, vy = 0;
       if (upK) vy -= 1;
       if (dnK) vy += 1;
       if (lfK) vx -= 1;
       if (rtK) vx += 1;
-    
+
       if (vx !== 0 || vy !== 0) {
         const len = Math.hypot(vx, vy);
         vx = (vx / len) * MOVE_SPEED;
         vy = (vy / len) * MOVE_SPEED;
-    
+
         const theta = Math.atan2(vy, vx);
         const oct = angleToOctant(theta);
         state.dir = octantToDir[oct];
-    
+
         state.accAnim += dt;
         if (state.accAnim >= 1 / ANIM_FPS) {
           state.frame = (state.frame + 1) % FRAMES;
@@ -295,22 +260,20 @@ const Character = ({ grid, paused }: CharacterProps) => {
         state.frame = 0;
         state.accAnim = 0;
       }
-    
+
       const moved = moveWithWorldCollision(state.px, state.py, vx, vy, dt, grid);
       state.px = moved.x;
       state.py = moved.y;
-
-      // ✅ 전역 상태 업데이트 (위치 유지)
       if (globalState) {
         globalState.px = state.px;
         globalState.py = state.py;
       }
-    
+
       window.dispatchEvent(new CustomEvent("player-pos", { detail: { x: state.px, y: state.py } }));
-    
+
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       ctx.imageSmoothingEnabled = false;
-    
+
       let skipDraw = false;
       if (state.invincibleUntil > performance.now()) {
         state.blinkPhase += dt * 20;
@@ -318,32 +281,13 @@ const Character = ({ grid, paused }: CharacterProps) => {
       } else {
         state.blinkPhase = 0;
       }
-    
+
       if (!skipDraw) {
         const sx = (state.frame % FRAMES) * frameW;
         const sy = 0;
         ctx.drawImage(img, sx, sy, frameW, frameH, destX, destY, destW, destH);
       }
-    
-      for (let i = state.effects.length - 1; i >= 0; i--) {
-        const e = state.effects[i];
-        e.t += dt;
-        if (e.t >= e.life) state.effects.splice(i, 1);
-      }
-      for (const e of state.effects) {
-        const k = Math.min(1, e.t / e.life);
-        const r = 16 + 64 * k;
-        const alpha = 1 - k;
-        ctx.save();
-        ctx.globalAlpha = alpha;
-        ctx.lineWidth = 3;
-        ctx.strokeStyle = "#ffffaa";
-        ctx.beginPath();
-        ctx.arc(Math.floor(e.x), Math.floor(e.y - destH / 2), r, 0, Math.PI * 2);
-        ctx.stroke();
-        ctx.restore();
-      }
-    
+
       raf = requestAnimationFrame(loop);
     };
 

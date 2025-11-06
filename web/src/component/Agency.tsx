@@ -4,6 +4,7 @@ import NumberBaseball from "./NumberBaseball/NumberBaseball";
 import PauseUI from "./PauseUI/PauseUI";
 import SettingsUI from "./SettingsUI/SettingsUI";
 import HPBar from "./UI/HPBar";
+import ItemSlots from "./UI/ItemSlots";
 import GameOver from "./UI/GameOver";
 import GameVictory from "./UI/GameVictory";
 import { MODE_LENGTH, generateSecret } from "../type/numberBaseball";
@@ -31,7 +32,6 @@ function Agency({ difficulty, onMainMenu }: AgencyProps) {
 
   const [grid, setGrid] = useState<Cell[][]>([]);
 
-  // M 키로 게임 승리 테스트
   useEffect(() => {
     const handleKeyPress = (e: KeyboardEvent) => {
       if (e.key === 'm' || e.key === 'M') {
@@ -43,7 +43,6 @@ function Agency({ difficulty, onMainMenu }: AgencyProps) {
     return () => window.removeEventListener("keydown", handleKeyPress);
   }, []);
 
-  // 게임 일시정지 이벤트 리스너
   useEffect(() => {
     const onGamePaused = () => setPaused(true);
     const onGameResumed = () => setPaused(false);
@@ -57,7 +56,6 @@ function Agency({ difficulty, onMainMenu }: AgencyProps) {
     };
   }, []);
 
-  // Runner 충돌 이벤트 리스너
   useEffect(() => {
     const onCollide = () => {
       setPaused(true);
@@ -67,7 +65,6 @@ function Agency({ difficulty, onMainMenu }: AgencyProps) {
     return () => window.removeEventListener("enemyA-collide", onCollide as EventListener);
   }, []);
 
-  // 게임 승리 이벤트 리스너
   useEffect(() => {
     const onGameWin = () => {
       setPaused(true);
@@ -76,7 +73,6 @@ function Agency({ difficulty, onMainMenu }: AgencyProps) {
     return () => window.removeEventListener("game-win", onGameWin);
   }, []);
 
-  // 숫자야구 게임 종료 핸들러
   const handleClose = (res: {
     guess: string;
     result: { strike: number; ball: number; out: number };
@@ -92,19 +88,15 @@ function Agency({ difficulty, onMainMenu }: AgencyProps) {
     setAttemptCount(idx);
     setHistory((prev) => [...prev, res.historyLine]);
     
-    // ✅ 숫자야구에서 승리했을 때 (4S = 완전 정답)
     if (res.win) {
       console.log("숫자야구 승리! 게임 클리어!");
-      // 게임 승리 이벤트 발송
       window.dispatchEvent(new CustomEvent("game-win"));
       return;
     }
     
-    // ✅ 숫자야구 종료 후 몹 재배치 이벤트 발송
     window.dispatchEvent(new CustomEvent("reposition-mobs"));
   };
 
-  // 미로 생성
   useEffect(() => {
     const g = createGrid(MAP_WIDTH, MAP_HEIGHT);
     carveMazeDFS(g, 1, 1);
@@ -142,7 +134,6 @@ function Agency({ difficulty, onMainMenu }: AgencyProps) {
   };
 
   const handleRestart = () => {
-    // 게임 재시작 로직
     setPaused(false);
     setAttemptCount(0);
     setHistory([]);
@@ -153,10 +144,10 @@ function Agency({ difficulty, onMainMenu }: AgencyProps) {
         <div className="hp-bar">
             <HPBar />
         </div>
+        <ItemSlots />
 
         <div className="game-display">
             <Map grid={grid} paused={isPaused} />
-            {/* 모달 */}
             <NumberBaseball
                 open={nbOpen}
                 length={length}
@@ -173,7 +164,6 @@ function Agency({ difficulty, onMainMenu }: AgencyProps) {
             <h3>
                 ⚾ Number Baseball ⚾
             </h3>
-            {/* 여기에 시도 기록들 출력 */}
             {history.length === 0 ? (
                 <div style={{ opacity: 0.6 }}>No attempts yet.</div>
             ) : (
@@ -181,20 +171,16 @@ function Agency({ difficulty, onMainMenu }: AgencyProps) {
             )}
         </div>
 
-        {/* Pause UI */}
       <PauseUI
         onResume={handleResume}
         onMainMenu={onMainMenu}
         onSettings={handleSettings}
       />
 
-      {/* Settings UI */}
       <SettingsUI isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} />
 
-      {/* Game Over Screen */}
       <GameOver onRestart={handleRestart} onMainMenu={onMainMenu} />
 
-      {/* Game Victory Screen */}
       <GameVictory onMainMenu={onMainMenu} />
     </div>
   );
