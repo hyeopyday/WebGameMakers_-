@@ -21,11 +21,12 @@ import {
   findSpawnPoint
 } from "../../type/type";
 import { moveWithWorldCollision } from "./Physic/Physic";
+import { DIFFICULTY } from "../../type/difficulty";
 
 const FRAMES = 4;
 
 interface CharacterProps {
-  grid: Cell[][]; 
+  grid: Cell[][];
   paused?: boolean;
 }
 
@@ -41,6 +42,12 @@ const DIR = {
 } as const;
 
 type DirType = typeof DIR[keyof typeof DIR];
+
+let globalState: {
+  px: number;
+  py: number;
+  initialized: boolean;
+} | null = null;
 
 const Character = ({ grid, paused }: CharacterProps) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -104,18 +111,21 @@ const Character = ({ grid, paused }: CharacterProps) => {
       },
       spaceHeld: false,
       effects: [] as { x: number; y: number; t: number; life: number }[],
-
-      // ▼ 추가: 체력/무적
-      hp: 3,
-      maxHP: 3,
-      invincibleUntil: 0,      // ms 타임스탬프
-      blinkPhase: 0,           // 깜빡임 위상
+      hp: DIFFICULTY.playerMaxHP,
+      maxHP: DIFFICULTY.playerMaxHP,
+      invincibleUntil: 0,
+      blinkPhase: 0,
+      isDead: false,
     };
 
-    {
+    if (!globalState || !globalState.initialized) {
       const spawn = findSpawnPoint(grid, { clearance: 0 });
       state.px = spawn.x;
       state.py = spawn.y;
+      globalState = { px: spawn.x, py: spawn.y, initialized: true };
+    } else {
+      state.px = globalState.px;
+      state.py = globalState.py;
     }
 
     const useItem = () => {
@@ -124,7 +134,7 @@ const Character = ({ grid, paused }: CharacterProps) => {
     };
 
     const onKeyDown = (e: KeyboardEvent) => {
-      if (paused) { e.preventDefault(); return; }   // ✅ 추가
+      if (paused || state.isDead) { e.preventDefault(); return; }
       if (e.code === "Space") {
         e.preventDefault();
         if (!state.spaceHeld) {
@@ -139,9 +149,9 @@ const Character = ({ grid, paused }: CharacterProps) => {
         state.key[k] = true;
       }
     };
-    
+
     const onKeyUp = (e: KeyboardEvent) => {
-      if (paused) { e.preventDefault(); return; }   // ✅ 추가
+      if (paused || state.isDead) { e.preventDefault(); return; }
       if (e.code === "Space") {
         state.spaceHeld = false;
         return;
@@ -152,26 +162,42 @@ const Character = ({ grid, paused }: CharacterProps) => {
         state.key[k] = false;
       }
     };
-    
 
     document.addEventListener("keydown", onKeyDown);
     document.addEventListener("keyup", onKeyUp);
 
-    // ▼ 추가: 피격 이벤트 리스너
     const onPlayerHit = (e: Event) => {
       const ce = e as CustomEvent<{ dmg?: number }>;
-      if (state.hp <= 0) return;
+      if (state.hp <= 0 || state.isDead) return;
       const now = performance.now();
       if (now < state.invincibleUntil) return;
+
       const dmg = Math.max(1, Math.floor(ce.detail?.dmg ?? 1));
       state.hp = Math.max(0, state.hp - dmg);
-      state.invincibleUntil = now + 800; // 0.8s i-frames
-      console.log(`[HP] ${state.hp}/${state.maxHP}`);
+      state.invincibleUntil = now + 1000;
+
       if (state.hp === 0) {
+        state.isDead = true;
         window.dispatchEvent(new CustomEvent("player-dead"));
       }
     };
     window.addEventListener("player-hit", onPlayerHit as EventListener);
+
+    const onResetHP = () => {
+      state.maxHP = DIFFICULTY.playerMaxHP;
+      state.hp = state.maxHP;
+      state.isDead = false;
+      state.invincibleUntil = 0;
+
+      const spawn = findSpawnPoint(grid, { clearance: 0 });
+      state.px = spawn.x;
+      state.py = spawn.y;
+      if (globalState) {
+        globalState.px = state.px;
+        globalState.py = state.py;
+      }
+    };
+    window.addEventListener("reset-hp", onResetHP);
 
     const octantToDir: DirType[] = [
       DIR.LEFT,
@@ -195,8 +221,7 @@ const Character = ({ grid, paused }: CharacterProps) => {
       if (!state.lastTime) state.lastTime = t;
       const dt = Math.min(0.033, (t - state.lastTime) / 1000);
       state.lastTime = t;
-    
-      // 렌더에 필요한 값 미리 계산
+
       const img = imgs[state.dir];
       const frameW = img.naturalWidth > 0 ? Math.floor(img.naturalWidth / FRAMES) : 64;
       const frameH = img.naturalHeight > 0 ? img.naturalHeight : 64;
@@ -204,13 +229,11 @@ const Character = ({ grid, paused }: CharacterProps) => {
       const destH = frameH * SPRITE_SCALE;
       const destX = Math.floor(state.px - destW / 2);
       const destY = Math.floor(state.py - destH);
-    
-      // ✅ 일시정지: 입력/이동/애니메이션/이펙트 계산 스킵, 현재 프레임만 그리기
-      if (paused) {
+
+      if (paused || state.isDead) {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         ctx.imageSmoothingEnabled = false;
-    
-        // (옵션) 무적 깜빡임은 유지
+
         let skipDraw = false;
         if (state.invincibleUntil > performance.now()) {
           state.blinkPhase += dt * 20;
@@ -218,38 +241,40 @@ const Character = ({ grid, paused }: CharacterProps) => {
         } else {
           state.blinkPhase = 0;
         }
-    
+
         if (!skipDraw) {
           const sx = (state.frame % FRAMES) * frameW;
           const sy = 0;
+
+          if (state.isDead) ctx.globalAlpha = 0.3;
           ctx.drawImage(img, sx, sy, frameW, frameH, destX, destY, destW, destH);
+          if (state.isDead) ctx.globalAlpha = 1;
         }
-    
+
         raf = requestAnimationFrame(loop);
-        return; // ⬅️ 아래 로직 모두 정지
+        return;
       }
-    
-      // ⬇️ 여기부터 기존 로직 유지
+
       const upK = state.key.ArrowUp || state.key.w;
       const dnK = state.key.ArrowDown || state.key.s;
       const lfK = state.key.ArrowLeft || state.key.a;
       const rtK = state.key.ArrowRight || state.key.d;
-    
+
       let vx = 0, vy = 0;
       if (upK) vy -= 1;
       if (dnK) vy += 1;
       if (lfK) vx -= 1;
       if (rtK) vx += 1;
-    
+
       if (vx !== 0 || vy !== 0) {
         const len = Math.hypot(vx, vy);
         vx = (vx / len) * MOVE_SPEED;
         vy = (vy / len) * MOVE_SPEED;
-    
+
         const theta = Math.atan2(vy, vx);
         const oct = angleToOctant(theta);
         state.dir = octantToDir[oct];
-    
+
         state.accAnim += dt;
         if (state.accAnim >= 1 / ANIM_FPS) {
           state.frame = (state.frame + 1) % FRAMES;
@@ -261,17 +286,21 @@ const Character = ({ grid, paused }: CharacterProps) => {
         state.frame = 0;
         state.accAnim = 0;
       }
-    
+
       const moved = moveWithWorldCollision(state.px, state.py, vx, vy, dt, grid);
       state.px = moved.x;
       state.py = moved.y;
-    
+
+      if (globalState) {
+        globalState.px = state.px;
+        globalState.py = state.py;
+      }
+
       window.dispatchEvent(new CustomEvent("player-pos", { detail: { x: state.px, y: state.py } }));
-    
+
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       ctx.imageSmoothingEnabled = false;
-    
-      // 무적 깜빡임
+
       let skipDraw = false;
       if (state.invincibleUntil > performance.now()) {
         state.blinkPhase += dt * 20;
@@ -279,13 +308,13 @@ const Character = ({ grid, paused }: CharacterProps) => {
       } else {
         state.blinkPhase = 0;
       }
-    
+
       if (!skipDraw) {
         const sx = (state.frame % FRAMES) * frameW;
         const sy = 0;
         ctx.drawImage(img, sx, sy, frameW, frameH, destX, destY, destW, destH);
       }
-    
+
       for (let i = state.effects.length - 1; i >= 0; i--) {
         const e = state.effects[i];
         e.t += dt;
@@ -304,10 +333,9 @@ const Character = ({ grid, paused }: CharacterProps) => {
         ctx.stroke();
         ctx.restore();
       }
-    
+
       raf = requestAnimationFrame(loop);
     };
-    
 
     let loaded = 0;
     const tryStart = () => {
@@ -325,6 +353,7 @@ const Character = ({ grid, paused }: CharacterProps) => {
       document.removeEventListener("keydown", onKeyDown);
       document.removeEventListener("keyup", onKeyUp);
       window.removeEventListener("player-hit", onPlayerHit as EventListener);
+      window.removeEventListener("reset-hp", onResetHP);
     };
   }, [grid, paused]);
 

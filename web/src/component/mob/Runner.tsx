@@ -1,5 +1,5 @@
 // FILE: src/component/mob/Runner.tsx
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { Cell } from "../../type/type";
 import {
   MAP_WIDTH,
@@ -11,11 +11,13 @@ import {
 } from "../../type/type";
 import { moveWithWorldCollision } from "./Physic/Physic";
 import runnerPng from "../../assets/Runner.png";
+import { DIFFICULTY, DIFFICULTY_CHANGED } from "../../type/difficulty";
 
 interface RunnerProps {
-  grid: Cell[][]; paused?: boolean;}
+  grid: Cell[][];
+  paused?: boolean;
+}
 
-const RUNNER_SPEED = 175;
 const CELL_SIZE = TILE_SIZE * SCALE;
 const PATH_RECALC_TIME = 0.35;
 const SAFE_INNER = 300;
@@ -30,8 +32,14 @@ const SPRITE_H = 16;
 const SPRITE_SCALE = 2;
 const FRAMES = 1;
 const ANIM_FPS = 8;
-const COLLIDE_RADIUS = 20;       // 픽셀 반경 (원하는 값으로 조정 가능)
-const COLLIDE_COOLDOWN = 0.8;    // 초단위 쿨다운 (연속 발동 방지)
+const COLLIDE_RADIUS = 20;
+const COLLIDE_COOLDOWN = 0.8;
+
+let globalRunnerState: {
+  px: number;
+  py: number;
+  initialized: boolean;
+} | null = null;
 
 function clamp(n: number, lo: number, hi: number) {
   return Math.max(lo, Math.min(hi, n));
@@ -136,6 +144,9 @@ function pickEscapePath(
 
 const Runner = ({ grid, paused }: RunnerProps) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  // ✅ 난이도 변경 감지를 위한 상태
+  const [difficultyVersion, setDifficultyVersion] = useState(0);
+  
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -158,6 +169,9 @@ const Runner = ({ grid, paused }: RunnerProps) => {
     const img = new Image();
     img.src = runnerPng;
 
+    // ✅ 현재 난이도 로깅
+    console.log(`[Runner] 난이도: ${DIFFICULTY.name}, 속도: ${DIFFICULTY.runnerSpeed} 타일/초`);
+
     const state = {
       px: 0, py: 0, frame: 0, accAnim: 0,
       path: [] as { x: number; y: number }[],
@@ -170,13 +184,18 @@ const Runner = ({ grid, paused }: RunnerProps) => {
       lastPlayerPos: { x: 0, y: 0 },
       lastPdist: Number.POSITIVE_INFINITY,
       preferLeft: true,
-
       collideCd: 0,
     };
 
-    const s = findSpawnPoint(grid, { clearance: 0 });
-    state.px = s.x;
-    state.py = s.y;
+    if (!globalRunnerState || !globalRunnerState.initialized) {
+      const s = findSpawnPoint(grid, { clearance: 0 });
+      state.px = s.x;
+      state.py = s.y;
+      globalRunnerState = { px: s.x, py: s.y, initialized: true };
+    } else {
+      state.px = globalRunnerState.px;
+      state.py = globalRunnerState.py;
+    }
 
     const onPlayerPos = (e: Event) => {
       const ce = e as CustomEvent<{ x: number; y: number }>;
@@ -185,6 +204,52 @@ const Runner = ({ grid, paused }: RunnerProps) => {
       state.havePlayer = true;
     };
     window.addEventListener("player-pos", onPlayerPos as EventListener);
+
+    const onRepositionMobs = () => {
+      const WORLD_W = MAP_WIDTH * TILE_SIZE * SCALE;
+      const WORLD_H = MAP_HEIGHT * TILE_SIZE * SCALE;
+      
+      const targetCellX = state.targetX < WORLD_W / 2 
+        ? Math.floor(MAP_WIDTH * 0.8) 
+        : Math.floor(MAP_WIDTH * 0.2);
+      const targetCellY = state.targetY < WORLD_H / 2 
+        ? Math.floor(MAP_HEIGHT * 0.8) 
+        : Math.floor(MAP_HEIGHT * 0.2);
+      
+      let foundX = targetCellX;
+      let foundY = targetCellY;
+      let found = false;
+      
+      for (let radius = 0; radius < 10 && !found; radius++) {
+        for (let dy = -radius; dy <= radius && !found; dy++) {
+          for (let dx = -radius; dx <= radius && !found; dx++) {
+            const checkX = targetCellX + dx;
+            const checkY = targetCellY + dy;
+            if (checkX >= 0 && checkX < MAP_WIDTH && checkY >= 0 && checkY < MAP_HEIGHT) {
+              if (grid[checkY][checkX] !== WALL) {
+                foundX = checkX;
+                foundY = checkY;
+                found = true;
+              }
+            }
+          }
+        }
+      }
+      
+      state.px = (foundX + 0.5) * CELL_SIZE;
+      state.py = (foundY + 1) * CELL_SIZE;
+      
+      if (globalRunnerState) {
+        globalRunnerState.px = state.px;
+        globalRunnerState.py = state.py;
+      }
+      
+      state.path = [];
+      state.mode = "idle";
+      
+      console.log(`Runner repositioned to opposite corner: (${foundX}, ${foundY})`);
+    };
+    window.addEventListener("reposition-mobs", onRepositionMobs as EventListener);
 
     let raf = 0;
 
@@ -219,7 +284,6 @@ const Runner = ({ grid, paused }: RunnerProps) => {
       const dt = Math.min(0.033, (t - state.lastTime) / 1000);
       state.lastTime = t;
 
-      /// 추가한 부분 
       if (paused) {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         ctx.imageSmoothingEnabled = false;
@@ -236,13 +300,12 @@ const Runner = ({ grid, paused }: RunnerProps) => {
           );
         }
         raf = requestAnimationFrame(loop);
-        return; // ✅ 이동/충돌/경로/쿨다운 갱신 모두 막음
+        return;
       }
 
       state.pathTimer += dt;
       if (state.goalLock > 0) state.goalLock -= dt;
       if (state.collideCd > 0) state.collideCd -= dt;
-
 
       const pdx = state.targetX - state.px;
       const pdy = state.targetY - state.py;
@@ -253,14 +316,11 @@ const Runner = ({ grid, paused }: RunnerProps) => {
 
       if (state.havePlayer && pdist <= COLLIDE_RADIUS && state.collideCd <= 0) {
         state.collideCd = COLLIDE_COOLDOWN;
-
-        // 숫자야구 실행을 외부에 알림 (글로벌 이벤트)
         window.dispatchEvent(new CustomEvent("enemyA-collide"));
-      
-        // 몹은 도망가기 모드 유지하도록 약간의 보정(옵션)
         state.mode = "escape";
         state.pathTimer = PATH_RECALC_TIME;
       }
+
       const pcx = Math.floor(state.targetX / CELL_SIZE);
       const pcy = Math.floor(state.targetY / CELL_SIZE);
       const playerMovedCell = pcx !== state.lastPlayerCell.x || pcy !== state.lastPlayerCell.y;
@@ -296,11 +356,33 @@ const Runner = ({ grid, paused }: RunnerProps) => {
           state.path.shift();
         } else {
           const denom = Math.max(d2, 1e-6);
-          const vx = (ndx / denom) * RUNNER_SPEED;
-          const vy = (ndy / denom) * RUNNER_SPEED;
-          const moved = moveWithWorldCollision(state.px, state.py, vx, vy, dt, grid);
-          state.px = clamp(moved.x, 0, WORLD_W);
-          state.py = clamp(moved.y, 0, WORLD_H);
+          // ✅ 매 프레임 최신 난이도 속도 사용
+          const speed = DIFFICULTY.runnerSpeed * CELL_SIZE;
+          const vx = (ndx / denom) * speed;
+          const vy = (ndy / denom) * speed;
+
+          const totalDx = vx * dt;
+          const totalDy = vy * dt;
+          const moveDist = Math.hypot(totalDx, totalDy);
+          const maxStep = Math.max(6, Math.floor(TILE_SIZE * SCALE * 0.5));
+          const steps = Math.max(1, Math.ceil(moveDist / maxStep));
+          const subDt = dt / steps;
+
+          let nx = state.px;
+          let ny = state.py;
+          for (let i = 0; i < steps; i++) {
+            const moved = moveWithWorldCollision(nx, ny, vx, vy, subDt, grid);
+            nx = moved.x;
+            ny = moved.y;
+          }
+          state.px = clamp(nx, 0, WORLD_W);
+          state.py = clamp(ny, 0, WORLD_H);
+
+          if (globalRunnerState) {
+            globalRunnerState.px = state.px;
+            globalRunnerState.py = state.py;
+          }
+
           window.dispatchEvent(new CustomEvent("runner-pos", { detail: { x: state.px, y: state.py } }));
         }
       } else if (state.mode === "escape" && pdist < ESCAPE_KEEP) {
@@ -334,16 +416,26 @@ const Runner = ({ grid, paused }: RunnerProps) => {
       raf = requestAnimationFrame(loop);
     };
 
-    // 최초 위치도 즉시 한 번 알림
     window.dispatchEvent(new CustomEvent("runner-pos", { detail: { x: state.px, y: state.py } }));
-
     raf = requestAnimationFrame(loop);
 
     return () => {
       cancelAnimationFrame(raf);
       window.removeEventListener("player-pos", onPlayerPos as EventListener);
+      window.removeEventListener("reposition-mobs", onRepositionMobs as EventListener);
     };
-  }, [grid, paused]);
+  }, [grid, paused, difficultyVersion]); // ✅ difficultyVersion 의존성 추가
+
+  // ✅ 난이도 변경 감지
+  useEffect(() => {
+    const handleDifficultyChange = () => {
+      console.log(`[Runner] 난이도 변경 감지: ${DIFFICULTY.name}`);
+      setDifficultyVersion(v => v + 1); // 컴포넌트 리렌더링 트리거
+    };
+
+    window.addEventListener(DIFFICULTY_CHANGED, handleDifficultyChange);
+    return () => window.removeEventListener(DIFFICULTY_CHANGED, handleDifficultyChange);
+  }, []);
 
   return (
     <canvas
@@ -353,4 +445,5 @@ const Runner = ({ grid, paused }: RunnerProps) => {
     />
   );
 };
+
 export default Runner;
