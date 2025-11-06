@@ -1,15 +1,13 @@
 // FILE: src/components/Character.tsx
 import { useEffect, useRef } from "react";
-
-// ✅ 파일 매핑 바로잡음
-import downPng from "../../assets/character_down.png";
+import downPng from "../../assets/character_up.png";
 import leftPng from "../../assets/character_left.png";
 import rightPng from "../../assets/character_right.png";
-import upPng from "../../assets/character_up.png";
-import downLeftPng from "../../assets/character_down_left.png";
-import downRightPng from "../../assets/character_down_right.png";
-import upLeftPng from "../../assets/character_up_left.png";
-import upRightPng from "../../assets/character_up_right.png";
+import upPng from "../../assets/character_down.png";
+import downLeftPng from "../../assets/character_up_left.png";
+import downRightPng from "../../assets/character_up_right.png";
+import upLeftPng from "../../assets/character_down_left.png";
+import upRightPng from "../../assets/character_down_right.png";
 
 import type { Cell } from "../../type/type";
 import {
