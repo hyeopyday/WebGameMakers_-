@@ -2,7 +2,7 @@
 > 이 프로젝트는 팀 협업 웹게임 개발을 위해 만들어졌습니다.
 
 - 협업 툴: GitHub
-- 코드 스타일: HTML/JavaScript/css
+- 코드 스타일: TypeScript/css
 
 ## 호스팅 주소
 > 호스팅 주소입니더.
